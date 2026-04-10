@@ -64,12 +64,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (savedModel) {
         document.getElementById('modelNameInput').value = savedModel;
     } else {
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        if (isMobile) {
-            document.getElementById('modelNameInput').value = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
-        } else {
-            document.getElementById('modelNameInput').value = 'gemma-2-9b-it-q4f16_1-MLC';
-        }
+        // Default to the lightest model for everyone to prevent crashes and ensure speed
+        document.getElementById('modelNameInput').value = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
     }
 
     // Start Splash & Engine Pre-init
@@ -434,8 +430,13 @@ async function startSplashAndInit() {
         
         localStorage.setItem(crashKey, (loadCount + 1).toString());
 
-        // Initialize engine
-        engine = await CreateMLCEngine(modelName, { initProgressCallback });
+        // Initialize engine with limited context window to save memory
+        engine = await CreateMLCEngine(modelName, { 
+            initProgressCallback,
+            chatOpts: {
+                context_window_size: 2048 // Limit context to prevent OOM
+            }
+        });
         engine.activeModel = modelName;
         
         // Success! Clear crash count
@@ -693,9 +694,23 @@ async function generateSummary() {
                 document.getElementById('downloadProgressText').innerText = `${progressPercent}% - ${initProgress.text}`;
             };
 
+            // Unload previous engine if it exists to free up memory
+            if (engine) {
+                try {
+                    await engine.unload();
+                } catch (e) {
+                    console.warn("Failed to unload previous engine:", e);
+                }
+            }
+
             engine = await CreateMLCEngine(
                 modelName,
-                { initProgressCallback: initProgressCallback }
+                { 
+                    initProgressCallback: initProgressCallback,
+                    chatOpts: {
+                        context_window_size: 2048 // Limit context to prevent OOM
+                    }
+                }
             );
             engine.activeModel = modelName;
         }
@@ -744,7 +759,13 @@ async function generateSummary() {
             const doneIcon = section.querySelector('.task-done');
 
             const messages = [{ role: "user", content: prompt }];
-            const chunks = await engine.chat.completions.create({ messages, stream: true });
+            // Add max_tokens to speed up generation and prevent OOM during long outputs
+            const chunks = await engine.chat.completions.create({ 
+                messages, 
+                stream: true,
+                temperature: 0.7,
+                max_tokens: 1024
+            });
 
             let reply = "";
             for await (const chunk of chunks) {
@@ -778,18 +799,28 @@ async function generateSummary() {
 
     } catch (error) {
         console.error("WebLLM Error:", error);
+        
+        let errorMsg = error.message || String(error);
+        let isCrash = errorMsg.includes("Device was lost") || errorMsg.includes("Instance") || errorMsg.includes("disposed") || errorMsg.includes("memory");
+        
         const summaryDisplay = document.getElementById('summaryDisplay');
         summaryDisplay.innerHTML = `
-            <div class="bg-red-900/20 border border-red-800 p-4 rounded-lg text-red-200">
-                <h3 class="font-bold mb-2 flex items-center gap-2"><i data-lucide="alert-circle" class="w-5 h-5"></i> エラーが発生しました</h3>
-                <p class="text-xs mb-4">${error.message}</p>
-                <div class="text-[10px] text-red-300/70 space-y-1">
-                    <p>・WebGPUがサポートされているか確認してください（Chrome推奨）</p>
-                    <p>・デバイスのメモリ不足の可能性があります</p>
+            <div class="bg-red-900/20 border border-red-800 p-5 rounded-lg text-red-200">
+                <h3 class="font-bold text-lg mb-3 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-6 h-6 text-red-500"></i> AI処理エラー</h3>
+                <p class="text-sm mb-4 leading-relaxed">${isCrash ? "メモリ不足によりAIエンジンがクラッシュしました。" : errorMsg}</p>
+                <div class="bg-red-950/50 p-4 rounded border border-red-900/50 text-sm text-red-300 space-y-2">
+                    <p class="font-bold text-red-400">【解決方法】</p>
+                    <p>1. 画面右上の「WebLLM 設定」を開く</p>
+                    <p>2. モデルを「Llama 3.2 1B (超軽量)」に変更して保存</p>
+                    <p>3. ページを再読み込みする</p>
+                    <p class="text-xs mt-2 opacity-80">※他のタブやアプリを閉じると改善する場合があります。</p>
                 </div>
             </div>
         `;
         lucide.createIcons();
+        
+        // Try to recover engine state
+        engine = null;
     } finally {
         loadingIndicator.style.display = 'none';
         document.getElementById('generateBtn').disabled = false;
