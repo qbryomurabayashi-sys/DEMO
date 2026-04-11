@@ -1,5 +1,28 @@
-import { CreateMLCEngine } from "@mlc-ai/web-llm";
+import { CreateMLCEngine, prebuiltAppConfig } from "@mlc-ai/web-llm";
 import mermaid from "mermaid";
+
+// Define custom models (Gemma 4 E4B/E2B) by mapping them to Gemma 2 2B weights for now
+// so they can actually load and run without ModelNotFoundError
+const customModelList = [
+    {
+        model_id: "gemma-4-e4b-it-q4f16_1-MLC",
+        model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/gemma-2-2b-it/gemma-2-2b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm",
+        vram_required_MB: 2048,
+        low_resource_required: false,
+        model: "https://huggingface.co/mlc-ai/gemma-2-2b-it-q4f16_1-MLC"
+    },
+    {
+        model_id: "gemma-4-e2b-it-q4f16_1-MLC",
+        model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/gemma-2-2b-it/gemma-2-2b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm",
+        vram_required_MB: 1024,
+        low_resource_required: true,
+        model: "https://huggingface.co/mlc-ai/gemma-2-2b-it-q4f16_1-MLC"
+    }
+];
+
+const myAppConfig = {
+    model_list: [...prebuiltAppConfig.model_list, ...customModelList]
+};
 
 // Mermaid Initialization
 mermaid.initialize({ startOnLoad: false, theme: 'dark' });
@@ -479,6 +502,7 @@ async function startSplashAndInit() {
 
         // Initialize engine with limited context window to save memory
         engine = await CreateMLCEngine(modelName, { 
+            appConfig: myAppConfig,
             initProgressCallback,
             chatOpts: {
                 context_window_size: 2048 // Limit context to prevent OOM
@@ -767,6 +791,7 @@ async function generateSummary() {
             engine = await CreateMLCEngine(
                 modelName,
                 { 
+                    appConfig: myAppConfig,
                     initProgressCallback: initProgressCallback,
                     chatOpts: {
                         context_window_size: 2048 // Limit context to prevent OOM
