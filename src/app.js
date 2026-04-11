@@ -6,17 +6,19 @@ import mermaid from "mermaid";
 const customModelList = [
     {
         model_id: "gemma-4-e4b-it-q4f16_1-MLC",
-        model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/gemma-2-2b-it/gemma-2-2b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm",
-        vram_required_MB: 2048,
+        model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/gemma-2-2b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm",
+        vram_required_MB: 1895.3,
         low_resource_required: false,
+        required_features: ["shader-f16"],
         model: "https://huggingface.co/mlc-ai/gemma-2-2b-it-q4f16_1-MLC"
     },
     {
-        model_id: "gemma-4-e2b-it-q4f16_1-MLC",
-        model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/gemma-2-2b-it/gemma-2-2b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm",
-        vram_required_MB: 1024,
+        model_id: "gemma-4-E2B-it-q4f16_1-MLC",
+        model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/gemma-2-2b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm",
+        vram_required_MB: 1583.3,
         low_resource_required: true,
-        model: "https://huggingface.co/mlc-ai/gemma-2-2b-it-q4f16_1-MLC"
+        required_features: ["shader-f16"],
+        model: "https://huggingface.co/welcoma/gemma-4-E2B-it-q4f16_1-MLC"
     }
 ];
 
