@@ -350,11 +350,10 @@
                 <div>
                     <label class="block text-sm font-bold text-slate-300 mb-1">AIモデル選択 (速度 vs 精度)</label>
                     <select id="modelNameInput" class="w-full bg-slate-900 border border-slate-600 rounded-md px-4 py-2.5 text-sm text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition font-mono">
-                        <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">⚡ 超高速・軽量 (Llama 3.2 1B) - 動作が重い場合推奨</option>
-                        <option value="gemma-2-2b-it-q4f16_1-MLC">⚖️ 標準・バランス (Gemma 2 2B) - デフォルト</option>
-                        <option value="Llama-3.1-8B-Instruct-q4f16_1-MLC">🧠 高品質・重め (Llama 3.1 8B) - PC推奨</option>
+                        <option value="gemma-4-e4b-it-q4f16_1-MLC">🎙️ Gemma 4 E4B (音声ネイティブ・高精度) - デフォルト</option>
+                        <option value="gemma-4-e2b-it-q4f16_1-MLC">⚡ Gemma 4 E2B (音声ネイティブ・軽量)</option>
                     </select>
-                    <p class="text-xs text-slate-500 mt-1.5">※初回実行時にブラウザのキャッシュにモデルがダウンロードされます（1B: 約0.8GB / 2B: 約1.5GB / 8B: 約5GB）。</p>
+                    <p class="text-xs text-slate-500 mt-1.5">※初回実行時にブラウザのキャッシュにモデルがダウンロードされます。</p>
                 </div>
                 <div class="bg-emerald-900/20 border border-emerald-700/50 rounded-md p-4 text-xs text-emerald-200 leading-relaxed">
                     <strong class="flex items-center gap-1 mb-1 text-emerald-400"><i data-lucide="info" class="w-4 h-4"></i> WebGPUについて</strong>

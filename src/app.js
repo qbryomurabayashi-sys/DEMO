@@ -497,9 +497,9 @@ async function startSplashAndInit() {
         setTimeout(() => splashScreen.remove(), 700);
     } catch (err) {
         console.error("Splash Init Error:", err);
-        if (modelName.includes('gemma-4-e4b')) {
-            splashStatusText.innerText = "現在モデルの読み込みに対応待ちです（Gemma 4 E4B）。";
-            splashSubtext.innerText = "WebLLMの最新バージョンへのアップデートをお待ちください。設定から別のモデルを選択してください。";
+        if (modelName.includes('gemma-4-')) {
+            splashStatusText.innerText = `現在モデルの読み込みに対応待ちです（${modelName.includes('e4b') ? 'Gemma 4 E4B' : 'Gemma 4 E2B'}）。`;
+            splashSubtext.innerText = "WebLLMの最新バージョンへのアップデートをお待ちください。";
             splashLoadingArea.classList.remove('opacity-0');
             splashChangeModelBtn.classList.add('animate-bounce', 'text-blue-400', 'border-blue-400');
         } else {
@@ -875,17 +875,17 @@ async function generateSummary() {
         
         let errorMsg = error.message || String(error);
         let isCrash = errorMsg.includes("Device was lost") || errorMsg.includes("Instance") || errorMsg.includes("disposed") || errorMsg.includes("memory");
-        let isUnsupported = modelName.includes('gemma-4-e4b') && errorMsg.includes("not found");
+        let isUnsupported = modelName.includes('gemma-4-') && errorMsg.includes("not found");
         
         const summaryDisplay = document.getElementById('summaryDisplay');
         summaryDisplay.innerHTML = `
             <div class="bg-red-900/20 border border-red-800 p-5 rounded-lg text-red-200">
                 <h3 class="font-bold text-lg mb-3 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-6 h-6 text-red-500"></i> AI処理エラー</h3>
-                <p class="text-sm mb-4 leading-relaxed">${isUnsupported ? "現在モデルの読み込みに対応待ちです（Gemma 4 E4B）。WebLLMのアップデートをお待ちください。" : (isCrash ? "メモリ不足によりAIエンジンがクラッシュしました。" : errorMsg)}</p>
+                <p class="text-sm mb-4 leading-relaxed">${isUnsupported ? `現在モデルの読み込みに対応待ちです（${modelName.includes('e4b') ? 'Gemma 4 E4B' : 'Gemma 4 E2B'}）。WebLLMのアップデートをお待ちください。` : (isCrash ? "メモリ不足によりAIエンジンがクラッシュしました。" : errorMsg)}</p>
                 <div class="bg-red-950/50 p-4 rounded border border-red-900/50 text-sm text-red-300 space-y-2">
                     <p class="font-bold text-red-400">【解決方法】</p>
                     <p>1. 画面右上の「WebLLM 設定」を開く</p>
-                    <p>2. モデルを「Gemma 2 2B」または「Llama 3.2 1B」に変更して保存</p>
+                    <p>2. モデルを変更して保存</p>
                     <p>3. ページを再読み込みする</p>
                     <p class="text-xs mt-2 opacity-80">※他のタブやアプリを閉じると改善する場合があります。</p>
                 </div>
