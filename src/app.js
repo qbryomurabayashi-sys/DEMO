@@ -519,6 +519,17 @@ async function startSplashAndInit() {
         });
         engine.activeModel = modelName;
         
+        // Update header display
+        const modelSelect = document.getElementById('modelNameInput');
+        const selectedOption = Array.from(modelSelect.options).find(opt => opt.value === modelName);
+        if (selectedOption) {
+            // Extract just the model name part (e.g., "Gemma 4 E4B") from the option text
+            const displayName = selectedOption.text.split('(')[0].replace(/^[^\w]+/, '').trim();
+            document.getElementById('currentModelName').innerText = displayName;
+        } else {
+            document.getElementById('currentModelName').innerText = modelName;
+        }
+        
         // Success! Clear crash count
         localStorage.removeItem(crashKey);
         
@@ -816,7 +827,6 @@ async function generateSummary() {
         for (const task of selectedTasks) {
             let prompt = "";
             let taskTitle = "";
-            let isMermaid = false;
 
             if (task === 'correction') {
                 taskTitle = "文字起こし補正";
@@ -835,13 +845,6 @@ async function generateSummary() {
             } else if (task === 'minutes') {
                 taskTitle = "議事録作成";
                 prompt = `以下の文字起こしデータから、ビジネス議事録を作成してください。出力は日本語で行ってください。\n\n【フォーマット】\n1. 会議の目的\n2. 決定事項\n3. 議題ごとの詳細\n4. Next Action（タスクと担当）\n\n--- 文字起こしデータ ---\n${finalTranscript}`;
-            } else if (task === 'mindmap') {
-                taskTitle = "マインドマップ";
-                isMermaid = true;
-                prompt = `以下の会議内容から、主要なトピックとその関係性を示すマインドマップをMermaid形式（mindmap）で作成してください。余計な説明は省き、\`\`\`mermaid で囲まれたコードブロックのみを出力してください。日本語を使用してください。\n\n--- 会議内容 ---\n${finalTranscript}`;
-            } else if (task === 'infographic') {
-                taskTitle = "インフォグラフィック構成案";
-                prompt = `以下の会議内容を、視覚的に分かりやすいインフォグラフィックの構成案として要約してください。セクション分け、アイコンの提案、重要な数値やキーワードを強調した形式で出力してください。出力は日本語で行ってください。\n\n--- 会議内容 ---\n${finalTranscript}`;
             }
 
             // Create section in UI
@@ -884,20 +887,6 @@ async function generateSummary() {
 
             loader.classList.add('hidden');
             doneIcon.classList.remove('hidden');
-
-            if (isMermaid) {
-                // More robust Mermaid extraction
-                const mermaidMatch = reply.match(/```mermaid\n?([\s\S]*?)\n?```/i);
-                const code = mermaidMatch ? mermaidMatch[1].trim() : reply.trim();
-                
-                contentDiv.innerHTML = `<div class="mermaid" data-code="${code.replace(/"/g, '&quot;')}">${code}</div>`;
-                try {
-                    await mermaid.run({ nodes: [contentDiv.querySelector('.mermaid')] });
-                } catch (mErr) {
-                    console.error("Mermaid Render Error:", mErr);
-                    contentDiv.innerText = "図解の生成に失敗しました。コード:\n" + code;
-                }
-            }
         }
 
         document.getElementById('copyAiBtn').classList.remove('hidden');
@@ -954,6 +943,7 @@ async function processRealtimeAI() {
         const prompt = `あなたは優秀な会議アシスタントです。
 以下の「最新の文字起こし」を、これまでの会話の流れ（文脈）を考慮して整理してください。
 フィラーの除去だけでなく、前後のつながりから誤字を推測して修正し、重要なポイントを簡潔な箇条書きで出力してください。
+※出力する際は、各箇条書きの項目ごとに必ず改行（\\n）を入れて、視覚的に見やすくしてください。
 
 --- 最新の文字起こし ---
 ${textToProcess}
