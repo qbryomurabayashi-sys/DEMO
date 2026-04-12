@@ -82,8 +82,67 @@ function checkRecovery() {
     }
 }
 
+// --- PWA & Browser Checks ---
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (!isMobile && !window.matchMedia('(display-mode: standalone)').matches) {
+        document.getElementById('pwaInstallModal').classList.remove('hidden');
+        lucide.createIcons();
+    }
+});
+
 // --- DOM Elements & Event Listeners ---
 window.addEventListener('DOMContentLoaded', async () => {
+    // 1. LINE Browser Check
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    if (ua.indexOf("Line") > -1) {
+        document.getElementById('lineWarningModal').classList.remove('hidden');
+        lucide.createIcons();
+    }
+
+    // 2. Register Service Worker for PWA & Handle Updates
+    let newWorker;
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').then(reg => {
+            reg.addEventListener('updatefound', () => {
+                newWorker = reg.installing;
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        document.getElementById('pwaUpdateModal').classList.remove('hidden');
+                        lucide.createIcons();
+                    }
+                });
+            });
+        }).catch(err => console.warn('SW registration failed:', err));
+
+        let refreshing;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (refreshing) return;
+            window.location.reload();
+            refreshing = true;
+        });
+    }
+
+    document.getElementById('pwaUpdateBtn')?.addEventListener('click', () => {
+        if (newWorker) {
+            newWorker.postMessage({ type: 'SKIP_WAITING' });
+        }
+    });
+
+    document.getElementById('pwaInstallBtn')?.addEventListener('click', async () => {
+        document.getElementById('pwaInstallModal').classList.add('hidden');
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt = null;
+        }
+    });
+    document.getElementById('pwaInstallCancelBtn')?.addEventListener('click', () => {
+        document.getElementById('pwaInstallModal').classList.add('hidden');
+    });
+
     initApp();
     
     // Device detection for default model (Move here to use in splash)

@@ -12,7 +12,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="AI議事録">
-    <link rel="apple-touch-icon" href="https://picsum.photos/seed/ai-app/192/192">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
     
     <!-- Tailwind CSS & Lucide Icons -->
     <link rel="stylesheet" href="/src/index.css">
@@ -352,6 +353,36 @@
             <div class="px-6 py-4 border-t border-slate-700 bg-slate-800/50 flex justify-end">
                 <button id="saveSettingsBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md text-sm font-bold transition shadow-sm">保存して閉じる</button>
             </div>
+        </div>
+    </div>
+
+    <!-- PWA Modals -->
+    <!-- LINE Browser Warning Modal -->
+    <div id="lineWarningModal" class="fixed inset-0 bg-slate-950/90 z-[200] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 class="text-xl font-bold text-red-400 mb-3 flex items-center gap-2"><i data-lucide="alert-triangle"></i> ブラウザ推奨</h3>
+            <p class="text-slate-300 text-sm mb-4 leading-relaxed">LINE内ブラウザではマイクやAI機能が正常に動作しません。<br><br>右上のメニュー（︙）から「他のブラウザで開く」を選択し、<strong class="text-emerald-400">Chrome</strong> または <strong class="text-blue-400">Edge</strong> をご利用ください。</p>
+        </div>
+    </div>
+
+    <!-- PWA Install Prompt Modal (PC) -->
+    <div id="pwaInstallModal" class="fixed inset-0 bg-slate-950/80 z-[200] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 class="text-xl font-bold text-blue-400 mb-3 flex items-center gap-2"><i data-lucide="download"></i> アプリとしてインストール</h3>
+            <p class="text-slate-300 text-sm mb-4 leading-relaxed">PCブラウザのタブとしてではなく、独立したアプリとしてインストールすることをお勧めします。より快適に動作します。</p>
+            <div class="flex justify-end gap-3">
+                <button id="pwaInstallCancelBtn" class="px-4 py-2 text-sm text-slate-400 hover:text-white transition">後で</button>
+                <button id="pwaInstallBtn" class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold transition">インストール</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PWA Update Modal -->
+    <div id="pwaUpdateModal" class="fixed bottom-4 right-4 bg-slate-800 border border-emerald-600/50 rounded-xl p-5 shadow-2xl z-[200] hidden max-w-sm animate-in slide-in-from-bottom-5">
+        <h3 class="text-lg font-bold text-emerald-400 mb-2 flex items-center gap-2"><i data-lucide="refresh-cw"></i> アップデートがあります</h3>
+        <p class="text-slate-300 text-sm mb-4">新しいバージョンが利用可能です。更新して最新機能を利用してください。</p>
+        <div class="flex justify-end gap-3">
+            <button id="pwaUpdateBtn" class="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-bold transition">今すぐ更新</button>
         </div>
     </div>
 
