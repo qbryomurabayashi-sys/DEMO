@@ -87,12 +87,19 @@ window.addEventListener('DOMContentLoaded', async () => {
     initApp();
     
     // Device detection for default model (Move here to use in splash)
-    const savedModel = localStorage.getItem('webllm_model');
-    if (savedModel) {
-        document.getElementById('modelNameInput').value = savedModel;
+    let savedModel = localStorage.getItem('webllm_model');
+    // Handle migration from old lowercase e2b to uppercase E2B
+    if (savedModel === 'gemma-4-e2b-it-q4f16_1-MLC') {
+        savedModel = 'gemma-4-E2B-it-q4f16_1-MLC';
+        localStorage.setItem('webllm_model', savedModel);
+    }
+    
+    const modelSelect = document.getElementById('modelNameInput');
+    if (savedModel && Array.from(modelSelect.options).some(opt => opt.value === savedModel)) {
+        modelSelect.value = savedModel;
     } else {
         // Default to Gemma 4 E4B as requested
-        document.getElementById('modelNameInput').value = 'gemma-4-e4b-it-q4f16_1-MLC';
+        modelSelect.value = 'gemma-4-e4b-it-q4f16_1-MLC';
     }
 
     // Start Splash & Engine Pre-init
