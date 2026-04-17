@@ -316,10 +316,10 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (!text) return;
         
         const timestamp = isRecording ? document.getElementById('timerDisplay').innerText : new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        const memoEntry = `\n[${timestamp}] 【手打ちメモ】 ${text}\n`;
+        const memoEntry = `\n[${timestamp}] 【重要メモ】 ${text}\n`;
         
         finalTranscript += memoEntry;
-        realtimeAiBuffer += `\n【手打ちメモ・重要】 ${text}\n`; // Append to realtime buffer
+        realtimeAiBuffer += `【重要メモ】 ${text} `; // Append to realtime buffer
         
         input.value = '';
         updateTranscriptionUI();
@@ -973,7 +973,14 @@ async function toggleRecording() {
 
 function updateTranscriptionUI() {
     const fullText = finalTranscript;
-    document.getElementById('transcriptionDisplay').innerText = fullText;
+    
+    // Highlight manual/important memos with bold and color
+    const escapedText = fullText.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[m]));
+    const highlighted = escapedText.replace(/\[\d{2}:\d{2}(?::\d{2})?\] 【重要メモ】.*$/gm, (match) => {
+        return `<span class="memo-highlight block my-1.5 p-3 rounded-lg border-2 border-amber-500/40 bg-amber-500/10 font-bold shadow-sm shadow-amber-900/20">${match}</span>`;
+    });
+
+    document.getElementById('transcriptionDisplay').innerHTML = highlighted;
     document.getElementById('interimDisplay').innerText = interimTranscript;
     
     if (fullText || interimTranscript) {
@@ -1164,8 +1171,8 @@ async function generateSummary() {
 }
 
 async function processRealtimeAI() {
-    // Increase buffer requirement to 80 chars to group into better sessions
-    if (!engine || isRealtimeProcessing || realtimeAiBuffer.length < 80) return;
+    // Increase buffer requirement to 100 chars for overall context
+    if (!engine || isRealtimeProcessing || realtimeAiBuffer.length < 100) return;
     
     const isRealtimeEnabled = document.getElementById('realtimeAiToggle');
     if (isRealtimeEnabled && !isRealtimeEnabled.checked) {
@@ -1174,26 +1181,37 @@ async function processRealtimeAI() {
     }
     
     isRealtimeProcessing = true;
-    const textToProcess = realtimeAiBuffer;
-    realtimeAiBuffer = ''; // Clear buffer
+    realtimeAiBuffer = ''; // Reset accumulation buffer
     
     try {
-        const prompt = `あなたは優秀な会議アシスタントです。
-以下の「最新の文字起こし段落」の内容をサマリーとして要約し、重要なポイントを箇条書きで整理してください。
-フィラー（えーと、あの等）は除去し、文脈から誤字を適宜補正して見やすくしてください。
-※出力する際は、各箇条書きの項目ごとに必ず改行（\\n）を入れてください。
+        // Extract all manual memos for high priority context
+        const manualMemos = (finalTranscript.match(/\[.*?\] 【重要メモ】.*?\n/g) || []).join('\n');
+        // Take last 2000 characters of transcription for context window
+        const recentTranscript = finalTranscript.slice(-2000);
 
---- 最新の文字起こし段落 ---
-${textToProcess}
+        const prompt = `あなたは優秀な会議書記アシスタントです。
+これまでの会議全体の流れを把握し、現時点での「全体的な要約」を更新してください。
+重要なポイントを簡潔に、構造化された箇条書きで整理して出力してください。
 
---- サマリー ---`;
+【最重要ルール】
+1. 「重要メモ」として記録されている事項は、ユーザーが直接指摘した極めて重要な情報です。これらは要約の核心として必ず含めてください。
+2. 直近のコンテキストから最新の展開を読み取り、要約を最新の状態に維持してください。
+3. フィラー（えー、あの、等）は完全に無視してください。
+
+--- 直近の会議内容 (コンテキスト) ---
+${recentTranscript}
+
+--- ユーザーによる重要メモ (最優先反映) ---
+${manualMemos || "（なし）"}
+
+--- 現在の最新・全体要約 (箇条書き) ---`;
 
         const messages = [{ role: "user", content: prompt }];
         const chunks = await engine.chat.completions.create({ 
             messages, 
             stream: true,
-            temperature: 0.3, // Lower temperature for more stable real-time output
-            max_tokens: 512
+            temperature: 0.3, 
+            max_tokens: 600
         });
 
         const realtimeDisplay = document.getElementById('realtimeAiDisplay');
@@ -1201,15 +1219,26 @@ ${textToProcess}
         if (placeholder) placeholder.classList.add('hidden');
         realtimeDisplay.classList.remove('hidden');
 
-        // Create new session block
-        const sessionBlock = document.createElement('div');
-        sessionBlock.className = 'mb-5 pb-5 border-b border-emerald-800/30 last:border-b-0';
+        // We use a single overall update block
+        let summaryContainer = document.getElementById('overallRealtimeSummary');
+        if (!summaryContainer) {
+            summaryContainer = document.createElement('div');
+            summaryContainer.id = 'overallRealtimeSummary';
+            summaryContainer.className = 'bg-emerald-950/20 p-4 rounded-lg border border-emerald-500/30';
+            realtimeDisplay.innerHTML = ''; // Clear old blocks
+            realtimeDisplay.appendChild(summaryContainer);
+        }
+
         const sessionTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-        sessionBlock.innerHTML = `<div class="text-xs font-bold text-emerald-500/70 mb-2 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> ${sessionTime} セッション要約</div><div class="content whitespace-pre-wrap break-words text-emerald-100 leading-relaxed text-sm"></div>`;
-        realtimeDisplay.appendChild(sessionBlock);
+        summaryContainer.innerHTML = `
+            <div class="text-[10px] font-bold text-emerald-400/60 mb-2 flex items-center gap-1 uppercase tracking-tighter">
+                <i data-lucide="refresh-cw" class="w-3 h-3 animate-spin"></i> LIVE OVERALL SUMMARY (LAST UPDATED: ${sessionTime})
+            </div>
+            <div class="content whitespace-pre-wrap break-words text-emerald-50 text-sm leading-relaxed"></div>
+        `;
         lucide.createIcons();
         
-        const contentDiv = sessionBlock.querySelector('.content');
+        const contentDiv = summaryContainer.querySelector('.content');
 
         let reply = "";
         for await (const chunk of chunks) {
@@ -1217,17 +1246,14 @@ ${textToProcess}
             reply += content;
             if (content) {
                 contentDiv.innerText = reply;
-                realtimeDisplay.parentElement.scrollTop = realtimeDisplay.parentElement.scrollHeight;
+                // Don't auto-scroll to bottom of display, let user read if they want
             }
         }
     } catch (e) {
         console.warn("Real-time AI Error:", e);
     } finally {
         isRealtimeProcessing = false;
-        // If buffer grew while processing, trigger again
-        if (realtimeAiBuffer.length >= 80) {
-            setTimeout(processRealtimeAI, 1000);
-        }
+        // If more text accumulated, check again later
     }
 }
 
