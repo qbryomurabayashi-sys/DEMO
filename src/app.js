@@ -104,6 +104,58 @@ window.addEventListener('beforeinstallprompt', (e) => {
     }
 });
 
+// --- Utility Functions ---
+async function fetchRemoteVersion() {
+    try {
+        // Cache busting with timestamp
+        const res = await fetch(`/version.json?t=${Date.now()}`);
+        if (res.ok) {
+            const data = await res.json();
+            return data.version;
+        }
+    } catch (e) {
+        console.warn("Failed to fetch remote version:", e);
+    }
+    return null;
+}
+
+function showSetupModal(oldVer, newVer) {
+    const setupModal = document.getElementById('setupModal');
+    const setupModalMessage = document.getElementById('setupModalMessage');
+    const finishSetupBtn = document.getElementById('finishSetupBtn');
+    const modelSelect = document.getElementById('modelNameInput');
+
+    if (!oldVer) {
+        setupModalMessage.innerText = "ご利用ありがとうございます。最高のAI体験を提供するため、初期セットアップを行います。推奨モデル（GEMMA 4）を選択してください。";
+    } else {
+        setupModalMessage.innerHTML = `バージョンが <strong>${oldVer}</strong> から <strong>${newVer}</strong> へアップデートされました。<br>最新のAIエンジンに合わせて、使用するモデルを再選択してください。`;
+    }
+
+    setupModal.classList.remove('hidden');
+    lucide.createIcons();
+
+    // Use a fresh cloned button to clear previous listeners
+    const newBtn = finishSetupBtn.cloneNode(true);
+    finishSetupBtn.parentNode.replaceChild(newBtn, finishSetupBtn);
+
+    newBtn.addEventListener('click', () => {
+        const selectedModel = document.querySelector('input[name="setupModel"]:checked').value;
+        localStorage.setItem('webllm_model', selectedModel);
+        localStorage.setItem('app_version', newVer);
+        setupModal.classList.add('hidden');
+        
+        // Re-sync UI
+        if (modelSelect) modelSelect.value = selectedModel;
+        
+        // Force reload to apply new engine if splash is gone, otherwise just load splash
+        if (!document.getElementById('splashScreen')) {
+            location.reload();
+        } else {
+            startSplashAndInit();
+        }
+    }, { once: true });
+}
+
 // --- DOM Elements & Event Listeners ---
 window.addEventListener('DOMContentLoaded', async () => {
     // 1. LINE Browser Check
@@ -154,43 +206,20 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
 
     initApp();
-    
-    // Version check for mandatory setup/update
-    const savedVersion = localStorage.getItem('app_version');
-    const isNewVersion = savedVersion !== APP_VERSION;
     const modelSelect = document.getElementById('modelNameInput');
     
-    // Device detection for default model (Move here to use in splash)
-    let savedModel = localStorage.getItem('webllm_model');
+    // Version check for mandatory setup/update (Remote & Local)
+    const savedVersion = localStorage.getItem('app_version');
+    const remoteVersion = await fetchRemoteVersion();
+    const effectiveVersion = remoteVersion || APP_VERSION;
+    const isNewVersion = savedVersion !== effectiveVersion;
     
     if (isNewVersion) {
-        const setupModal = document.getElementById('setupModal');
-        const setupModalMessage = document.getElementById('setupModalMessage');
-        const finishSetupBtn = document.getElementById('finishSetupBtn');
-        
-        if (!savedVersion) {
-            setupModalMessage.innerText = "ご利用ありがとうございます。最高のAI体験を提供するため、初期セットアップを行います。推奨モデル（GEMMA 4）を選択してください。";
-        } else {
-            setupModalMessage.innerHTML = `バージョンが <strong>${savedVersion}</strong> から <strong>${APP_VERSION}</strong> へアップデートされました。<br>最新のAIエンジンに合わせて、使用するモデルを再選択してください。`;
-        }
-        
-        setupModal.classList.remove('hidden');
-        lucide.createIcons();
-        
-        finishSetupBtn.addEventListener('click', () => {
-            const selectedModel = document.querySelector('input[name="setupModel"]:checked').value;
-            localStorage.setItem('webllm_model', selectedModel);
-            localStorage.setItem('app_version', APP_VERSION);
-            setupModal.classList.add('hidden');
-            
-            // Re-sync UI
-            modelSelect.value = selectedModel;
-            
-            startSplashAndInit();
-        }, { once: true });
-        
+        showSetupModal(savedVersion, effectiveVersion);
     } else {
         // Normal Startup
+        let savedModel = localStorage.getItem('webllm_model');
+        
         if (savedModel && Array.from(modelSelect.options).some(opt => opt.value === savedModel)) {
             modelSelect.value = savedModel;
         } else {
@@ -201,6 +230,18 @@ window.addEventListener('DOMContentLoaded', async () => {
         
         startSplashAndInit();
     }
+
+    // Periodic Background Version Check (every 5 minutes)
+    setInterval(async () => {
+        const latestVer = await fetchRemoteVersion();
+        const currentVer = localStorage.getItem('app_version');
+        if (latestVer && latestVer !== currentVer) {
+            // Check if modal is already open
+            if (document.getElementById('setupModal').classList.contains('hidden')) {
+                showSetupModal(currentVer, latestVer);
+            }
+        }
+    }, 5 * 60 * 1000);
 
     // Start Splash Model Change button
     document.getElementById('splashChangeModelBtn').addEventListener('click', () => {
