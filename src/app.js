@@ -1087,17 +1087,37 @@ async function generateSummary() {
             let prompt = "";
             let taskTitle = "";
 
-            const contextFlavor = `トーンは「${toneText}」で、長さは「${lengthText}」を意識してください。`;
+            const contextFlavor = `【出力設定】
+トーン: ${toneText}
+長さ: ${lengthText}
+
+【厳守事項】
+1. 与えられた文字起こしデータの内容に忠実に基づき、推測や嘘を混ぜないでください。
+2. 文脈が不明瞭な部分は無理に解釈せず、そのまま残すか、不明である旨を記載してください。
+3. 日本語の音声認識特有の誤変換（同音異義語など）を文脈から適切に判断して修正してください。`;
 
             if (task === 'correction') {
                 taskTitle = "文字起こし補正";
-                prompt = `以下の文字起こしデータの誤字脱字を修正し、読みやすく整形してください。${contextFlavor}\n\n[文字起こしデータ]\n${finalTranscript}`;
+                prompt = `あなたはプロの編集者です。以下の文字起こしデータの誤字脱字、音声認識エラー（カタカナの誤変換や助詞の抜け）を修正し、読みやすい文章に整えてください。
+${contextFlavor}
+
+[文字起こしデータ]
+${finalTranscript}`;
             } else if (task === 'minutes') {
                 taskTitle = "議事録作成";
-                prompt = `以下の内容から議事録を作成してください。${contextFlavor}\n決定事項やネクストアクションを明確に抽出してください。\n\n[内容]\n${finalTranscript}`;
+                prompt = `あなたは優秀な秘書です。以下の内容から、議論の要点、決定事項、および次回への課題を整理した議事録を作成してください。
+${contextFlavor}
+
+[会議内容]
+${finalTranscript}`;
             } else if (task === 'todo') {
                 taskTitle = "TODO抽出";
-                prompt = `以下の内容から、誰がいつまでに何をすべきか（TODO）をリストアップしてください。${contextFlavor}\n\n[内容]\n${finalTranscript}`;
+                prompt = `あなたはタスク管理の専門家です。以下の内容から、今後実行すべきアクション（TODO）を抽出してください。
+「誰が」「いつまでに」「何を」するのかがわかるようにリストアップしてください。不明な項目は「要確認」として扱ってください。
+${contextFlavor}
+
+[内容]
+${finalTranscript}`;
             }
 
             // UI Section
@@ -1118,8 +1138,8 @@ async function generateSummary() {
             const chunks = await engine.chat.completions.create({ 
                 messages, 
                 stream: true,
-                temperature: 0.6,
-                repetition_penalty: 1.1,
+                temperature: 0.2, // Lowered for higher factuality
+                repetition_penalty: 1.15,
                 max_tokens: 2048
             });
 
@@ -1167,28 +1187,28 @@ async function processRealtimeAI() {
         // Take last 2000 characters of transcription for context window
         const recentTranscript = finalTranscript.slice(-2000);
 
-        const prompt = `あなたは優秀な会議書記アシスタントです。
-これまでの会議全体の流れを把握し、現時点での「全体的な要約」を更新してください。
-重要なポイントを簡潔に、構造化された箇条書きで整理して出力してください。
+        const prompt = `あなたはプロの会議要約アシスタントです。
+これまでの会議の流れをリアルタイムで追跡し、現在の「全体要約」を最新の状態に更新してください。
 
-【最重要ルール】
-1. 「重要メモ」として記録されている事項は、ユーザーが直接指摘した極めて重要な情報です。これらは要約の核心として必ず含めてください。
-2. 直近のコンテキストから最新の展開を読み取り、要約を最新の状態に維持してください。
-3. フィラー（えー、あの、等）は完全に無視してください。
+【出力のガイドライン】
+1. **正確性優先**: 文字起こしデータにない情報を捏造しないでください。
+2. **情報の重要度**: ユーザーが記録した「重要メモ」の内容は、最優先で要約に反映させてください。
+3. **簡潔さ**: 構造化された箇条書きを使用し、数秒で状況が把握できるようにしてください。
+4. **ノイズ除去**: 談笑やフィラー（えー、あの等）は要約から除外してください。
 
---- 直近の会議内容 (コンテキスト) ---
+--- 会議の進行状況 (現在の文字起こし) ---
 ${recentTranscript}
 
---- ユーザーによる重要メモ (最優先反映) ---
-${manualMemos || "（なし）"}
+--- ユーザー指定の重要事項 (最優先) ---
+${manualMemos || "（特になし）"}
 
---- 現在の最新・全体要約 (箇条書き) ---`;
+--- 現時点までの要約 (箇条書き) ---`;
 
         const messages = [{ role: "user", content: prompt }];
         const chunks = await engine.chat.completions.create({ 
             messages, 
             stream: true,
-            temperature: 0.3, 
+            temperature: 0.1, 
             max_tokens: 600
         });
 
