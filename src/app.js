@@ -1,11 +1,41 @@
-import { CreateMLCEngine, prebuiltAppConfig } from "@mlc-ai/web-llm";
-import mermaid from "mermaid";
-import { marked } from "marked";
+let engine = null;
+let CreateMLCEngine = null;
+let prebuiltAppConfig = null;
+let mermaidLoaded = false;
+let markedInstance = null;
 
-const APP_VERSION = "2.0.2";
+// Lazy loader for AI libraries
+async function loadAiLibraries() {
+    if (CreateMLCEngine) return;
+    try {
+        const mlc = await import("@mlc-ai/web-llm");
+        CreateMLCEngine = mlc.CreateMLCEngine;
+        prebuiltAppConfig = mlc.prebuiltAppConfig;
+        
+        const markedMod = await import("marked");
+        markedInstance = markedMod.marked;
+    } catch (e) {
+        console.error("Failed to load AI libraries:", e);
+        throw e;
+    }
+}
+
+// Lazy loader for Mermaid
+async function loadMermaid() {
+    if (mermaidLoaded) return;
+    try {
+        const m = await (await import("mermaid")).default;
+        m.initialize({ startOnLoad: false, theme: 'dark' });
+        mermaidLoaded = true;
+        return m;
+    } catch (e) {
+        console.error("Failed to load Mermaid:", e);
+    }
+}
+
+const APP_VERSION = "2.0.3";
 
 // Define custom models (Gemma 4 E4B/E2B) by mapping them to Gemma 2 2B weights for now
-// so they can actually load and run without ModelNotFoundError
 const customModelList = [
     {
         model_id: "gemma-4-e4b-it-q4f16_1-MLC",
@@ -33,12 +63,13 @@ const customModelList = [
     }
 ];
 
-const myAppConfig = {
-    model_list: [...prebuiltAppConfig.model_list, ...customModelList]
-};
-
-// Mermaid Initialization
-mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+// Config getter
+async function getAppConfig() {
+    await loadAiLibraries();
+    return {
+        model_list: [...prebuiltAppConfig.model_list, ...customModelList]
+    };
+}
 
 // Lucide Icons Initialization
 lucide.createIcons();
@@ -57,7 +88,6 @@ let lastSavedAi = '';
 let lastSavedAudioSize = 0;
 
 // WebLLM Engine
-let engine = null;
 let realtimeAiBuffer = '';
 let isRealtimeProcessing = false;
 
@@ -437,25 +467,27 @@ async function loadHistory() {
     if (!db) return;
     const tx = db.transaction('sessions', 'readonly');
     const store = tx.objectStore('sessions');
-    const request = store.getAll();
+    
+    const list = document.getElementById('historyList');
+    list.innerHTML = '';
+    let totalSize = 0;
+    let count = 0;
+    const maxItems = 50; // Limit display items for performance
 
-    request.onsuccess = () => {
-        const sessions = request.result.sort((a, b) => b.timestamp - a.timestamp);
-        const list = document.getElementById('historyList');
-        list.innerHTML = '';
-
-        if (sessions.length === 0) {
-            list.innerHTML = '<div class="text-center py-10 text-slate-600 text-xs italic">保存されたデータはありません</div>';
-            return;
-        }
-
-        let totalSize = 0;
-        sessions.forEach(session => {
+    const cursorRequest = store.openCursor(null, 'prev');
+    
+    cursorRequest.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor && count < maxItems) {
+            const session = cursor.value;
+            count++;
+            
             const item = document.createElement('button');
             item.className = `w-full text-left p-3 rounded-md transition flex flex-col gap-1 group ${currentSessionId === session.id ? 'bg-blue-900/40 border border-blue-800/50' : 'hover:bg-slate-900 border border-transparent'}`;
             
             const date = new Date(session.timestamp).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             const title = session.title || '無題のセッション';
+            const snippet = session.text ? session.text.substring(0, 30) : '';
             
             item.innerHTML = `
                 <div class="flex justify-between items-start">
@@ -463,7 +495,7 @@ async function loadHistory() {
                     <span class="text-[10px] text-slate-500 shrink-0">${date}</span>
                 </div>
                 <div class="flex justify-between items-center mt-1">
-                    <span class="text-[10px] text-slate-500 truncate">${session.text.substring(0, 30)}...</span>
+                    <span class="text-[10px] text-slate-500 truncate">${snippet}...</span>
                     <div class="flex opacity-0 group-hover:opacity-100 transition">
                         <button class="edit-session-btn p-1 text-slate-600 hover:text-blue-400" data-id="${session.id}" title="タイトル編集">
                             <i data-lucide="edit-2" class="w-3 h-3"></i>
@@ -475,10 +507,10 @@ async function loadHistory() {
                 </div>
             `;
             
-            item.addEventListener('click', (e) => {
-                if (e.target.closest('.delete-session-btn')) {
+            item.addEventListener('click', (ev) => {
+                if (ev.target.closest('.delete-session-btn')) {
                     deleteSession(session.id);
-                } else if (e.target.closest('.edit-session-btn')) {
+                } else if (ev.target.closest('.edit-session-btn')) {
                     editSessionTitle(session.id, title);
                 } else {
                     loadSession(session.id);
@@ -486,12 +518,18 @@ async function loadHistory() {
             });
             list.appendChild(item);
             
-            // Estimate size
-            totalSize += (session.text.length * 2) + (session.audioBlob ? session.audioBlob.size : 0);
-        });
-        
-        lucide.createIcons();
-        updateStorageUsage(totalSize);
+            if (session.audioBlob) totalSize += session.audioBlob.size;
+            if (session.text) totalSize += session.text.length * 2;
+            if (session.aiResults) totalSize += session.aiResults.length * 2;
+            
+            cursor.continue();
+        } else {
+            if (count === 0) {
+                list.innerHTML = '<div class="text-center py-10 text-slate-600 text-xs italic">保存されたデータはありません</div>';
+            }
+            updateStorageUsage(totalSize);
+            lucide.createIcons();
+        }
     };
 }
 
@@ -555,7 +593,7 @@ async function loadSession(id) {
     const store = tx.objectStore('sessions');
     const request = store.get(id);
 
-    request.onsuccess = () => {
+    request.onsuccess = async () => {
         const session = request.result;
         if (!session) return;
 
@@ -593,14 +631,19 @@ async function loadSession(id) {
             
             // Re-render Mermaid if present
             const mermaidDivs = summaryDisplay.querySelectorAll('.mermaid');
-            mermaidDivs.forEach(div => {
-                const code = div.getAttribute('data-code');
-                if (code) {
-                    div.removeAttribute('data-processed');
-                    div.innerHTML = code;
+            if (mermaidDivs.length > 0) {
+                const m = await loadMermaid();
+                mermaidDivs.forEach(div => {
+                    const code = div.getAttribute('data-code');
+                    if (code) {
+                        div.removeAttribute('data-processed');
+                        div.innerHTML = code;
+                    }
+                });
+                if (m && m.run) {
+                    try { await m.run(); } catch(e) { console.error("Mermaid run error:", e); }
                 }
-            });
-            mermaid.run();
+            }
         } else {
             summaryDisplay.classList.add('hidden');
             summaryPlaceholder.classList.remove('hidden');
@@ -701,15 +744,21 @@ async function startSplashAndInit() {
         document.body.classList.add('is-mobile');
     }
 
-    if (!navigator.gpu) {
-        console.warn("WebGPU not supported. AI features restricted.");
-        if (splashSubtext) splashSubtext.innerText = "WebGPU非対応デバイスです。AI分析機能は制限されますが、録音と文字起こしは利用可能です。";
+    const isLowMemory = navigator.deviceMemory && navigator.deviceMemory < 8; // Less than 8GB RAM
+
+    if (!navigator.gpu || isMobile || isLowMemory) {
+        console.warn("Skipping AI preload to prevent memory crashes on mobile/low-memory devices.");
+        if (splashStatusText) splashStatusText.innerText = "軽量モードで起動します";
+        if (splashSubtext) splashSubtext.innerText = "モバイル端末またはメモリ節約のため、AIの自動読み込みをスキップしました。録音と文字起こしはすぐにご利用いただけます。";
+        const pb = document.getElementById('splashProgressBar');
+        if (pb) pb.classList.add('bg-blue-500');
+
         setTimeout(() => {
             if (splashScreen) {
                 splashScreen.classList.add('opacity-0');
                 setTimeout(() => splashScreen.remove(), 700);
             }
-        }, 3000);
+        }, 2000);
         return; 
     }
 
@@ -775,6 +824,10 @@ async function startSplashAndInit() {
         
         localStorage.setItem(crashKey, (loadCount + 1).toString());
 
+        // Dynamic Loading
+        await loadAiLibraries();
+        const myAppConfig = await getAppConfig();
+
         // Initialize engine with expanded context window for better coherence
         engine = await CreateMLCEngine(modelName, { 
             appConfig: myAppConfig,
@@ -832,12 +885,13 @@ async function startSplashAndInit() {
 function initApp() {
     setupMobileTabs();
     
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
         recognition.lang = 'ja-JP'; 
         recognition.continuous = true; 
-        recognition.interimResults = true;
+        recognition.interimResults = !isMobile; // Disable interim on mobile for stability
         recognition.maxAlternatives = 1;
         
         recognition.onerror = (event) => {
@@ -856,9 +910,16 @@ function initApp() {
                 const res = event.results[i];
                 if (res.isFinal) {
                     const text = res[0].transcript.trim();
-                    if (!text) continue; // Skip empty output which creates orphaned timestamps
-                    finalTranscript += `[${currentTime}] ${text}\n`;
+                    if (!text) continue; 
+                    
+                    const timestampStr = `[${currentTime}] `;
+                    finalTranscript += timestampStr + text + '\n';
                     localStorage.setItem('local_ai_assistant_text', finalTranscript);
+                    
+                    // Limit text size in localStorage to avoid crash
+                    if (finalTranscript.length > 500000) {
+                       localStorage.setItem('local_ai_assistant_text', finalTranscript.substring(finalTranscript.length - 500000));
+                    }
                     
                     // Add to buffer for real-time AI processing if enabled
                     const isRealtimeEnabled = document.getElementById('realtimeAiToggle')?.checked;
@@ -1117,6 +1178,8 @@ async function generateSummary() {
                 try { await engine.unload(); } catch (e) {}
             }
 
+            await loadAiLibraries();
+            const myAppConfig = await getAppConfig();
             engine = await CreateMLCEngine(modelName, { 
                 appConfig: myAppConfig,
                 initProgressCallback: initProgressCallback,
@@ -1198,8 +1261,8 @@ ${finalTranscript}`;
             for await (const chunk of chunks) {
                 const content = chunk.choices[0]?.delta?.content || "";
                 reply += content;
-                if (content) {
-                    contentDiv.innerHTML = marked.parse(reply);
+                if (content && markedInstance) {
+                    contentDiv.innerHTML = markedInstance.parse(reply);
                     document.getElementById('aiAnalysisResultsArea').scrollTop = document.getElementById('aiAnalysisResultsArea').scrollHeight;
                 }
             }
