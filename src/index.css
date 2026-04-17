@@ -9,6 +9,24 @@
     @apply font-bold text-amber-500 bg-amber-500/10 px-1 rounded;
 }
 
+@keyframes recording-glow {
+  0% { box-shadow: 0 0 5px rgba(239, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.8); }
+  100% { box-shadow: 0 0 5px rgba(239, 68, 68, 0.4); }
+}
+
+.recording-pulse {
+  animation: recording-glow 2s infinite ease-in-out;
+}
+
+.animate-spin-slow {
+  animation: spin 3s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }

@@ -866,9 +866,9 @@ async function toggleRecording() {
         
         recBtn.classList.remove('bg-red-600', 'hover:bg-red-700', 'recording-pulse');
         recBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
-        recBtn.innerHTML = '<i data-lucide="mic" class="w-4 h-4"></i> <span>録音開始</span>';
-        recIndicator.classList.remove('bg-red-500', 'animate-pulse');
-        recIndicator.classList.add('bg-slate-600');
+        recBtn.innerHTML = '<i data-lucide="mic" class="w-6 h-6"></i> <span>録音開始</span>';
+        recIndicator.classList.remove('bg-red-500', 'animate-pulse', 'shadow-[0_0_15px_rgba(239,68,68,0.6)]');
+        recIndicator.classList.add('bg-slate-600', 'shadow-[0_0_8px_rgba(71,85,105,0.4)]');
         lucide.createIcons();
         
         micSelect.disabled = false;
@@ -926,9 +926,9 @@ async function toggleRecording() {
             
             recBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
             recBtn.classList.add('bg-red-600', 'hover:bg-red-700', 'recording-pulse');
-            recBtn.innerHTML = '<i data-lucide="square" class="w-4 h-4 fill-current"></i> <span>録音停止</span>';
-            recIndicator.classList.remove('bg-slate-600');
-            recIndicator.classList.add('bg-red-500', 'animate-pulse');
+            recBtn.innerHTML = '<i data-lucide="square" class="w-6 h-6 fill-current"></i> <span>録音停止</span>';
+            recIndicator.classList.remove('bg-slate-600', 'shadow-[0_0_8px_rgba(71,85,105,0.4)]');
+            recIndicator.classList.add('bg-red-500', 'animate-pulse', 'shadow-[0_0_15px_rgba(239,68,68,0.6)]');
             lucide.createIcons();
             
             micSelect.disabled = true; 
