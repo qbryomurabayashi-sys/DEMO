@@ -147,9 +147,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     // Device detection for default model (Move here to use in splash)
     let savedModel = localStorage.getItem('webllm_model');
-    // Handle migration from old lowercase e2b to uppercase E2B
-    if (savedModel === 'gemma-4-e2b-it-q4f16_1-MLC') {
-        savedModel = 'gemma-4-E2B-it-q4f16_1-MLC';
+    // Handle migration from old models
+    if (savedModel && savedModel.includes('gemma-4')) {
+        savedModel = 'Llama-3.2-3B-Instruct-q4f16_1-MLC';
         localStorage.setItem('webllm_model', savedModel);
     }
     
@@ -157,8 +157,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (savedModel && Array.from(modelSelect.options).some(opt => opt.value === savedModel)) {
         modelSelect.value = savedModel;
     } else {
-        // Default to Gemma 4 E4B as requested
-        modelSelect.value = 'gemma-4-e4b-it-q4f16_1-MLC';
+        // Default to Llama 3.2 3B
+        modelSelect.value = 'Llama-3.2-3B-Instruct-q4f16_1-MLC';
     }
 
     // Start Splash & Engine Pre-init
@@ -213,6 +213,36 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
     document.getElementById('newSessionBtn').addEventListener('click', startNewSession);
     document.getElementById('downloadTextBtn').addEventListener('click', downloadAiOutput);
+
+    // Manual Memo
+    const addManualMemo = () => {
+        const input = document.getElementById('manualMemoInput');
+        const text = input.value.trim();
+        if (!text) return;
+        
+        const timestamp = isRecording ? document.getElementById('timerDisplay').innerText : new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const memoEntry = `\n[${timestamp}] 【手打ちメモ】 ${text}\n`;
+        
+        finalTranscript += memoEntry;
+        realtimeAiBuffer += `\n【手打ちメモ・重要】 ${text}\n`; // Append to realtime buffer
+        
+        input.value = '';
+        updateTranscriptionUI();
+        saveSession();
+        
+        // Trigger realtime AI immediately if recording
+        if (isRecording) {
+            processRealtimeAI();
+        }
+    };
+
+    document.getElementById('addMemoBtn').addEventListener('click', addManualMemo);
+    document.getElementById('manualMemoInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            addManualMemo();
+        }
+    });
 
     // Tab Switching
     document.getElementById('tabTranscription').addEventListener('click', () => switchTab('transcription'));
@@ -294,20 +324,27 @@ async function loadHistory() {
             
             item.innerHTML = `
                 <div class="flex justify-between items-start">
-                    <span class="text-xs font-bold text-slate-200 truncate pr-2">${title}</span>
+                    <span class="text-xs font-bold text-slate-200 truncate pr-2 w-full">${title}</span>
                     <span class="text-[10px] text-slate-500 shrink-0">${date}</span>
                 </div>
-                <div class="flex justify-between items-center">
+                <div class="flex justify-between items-center mt-1">
                     <span class="text-[10px] text-slate-500 truncate">${session.text.substring(0, 30)}...</span>
-                    <button class="delete-session-btn opacity-0 group-hover:opacity-100 p-1 text-slate-600 hover:text-red-400 transition" data-id="${session.id}">
-                        <i data-lucide="trash-2" class="w-3 h-3"></i>
-                    </button>
+                    <div class="flex opacity-0 group-hover:opacity-100 transition">
+                        <button class="edit-session-btn p-1 text-slate-600 hover:text-blue-400" data-id="${session.id}" title="タイトル編集">
+                            <i data-lucide="edit-2" class="w-3 h-3"></i>
+                        </button>
+                        <button class="delete-session-btn p-1 text-slate-600 hover:text-red-400" data-id="${session.id}" title="削除">
+                            <i data-lucide="trash-2" class="w-3 h-3"></i>
+                        </button>
+                    </div>
                 </div>
             `;
             
             item.addEventListener('click', (e) => {
                 if (e.target.closest('.delete-session-btn')) {
                     deleteSession(session.id);
+                } else if (e.target.closest('.edit-session-btn')) {
+                    editSessionTitle(session.id, title);
                 } else {
                     loadSession(session.id);
                 }
@@ -463,6 +500,25 @@ async function deleteSession(id) {
     };
 }
 
+async function editSessionTitle(id, currentTitle) {
+    const newTitle = prompt('新しいタイトルを入力してください', currentTitle);
+    if (newTitle !== null && newTitle.trim() !== '') {
+        const tx = db.transaction('sessions', 'readwrite');
+        const store = tx.objectStore('sessions');
+        const getReq = store.get(id);
+        getReq.onsuccess = (e) => {
+            const session = e.target.result;
+            if (session) {
+                session.title = newTitle.trim();
+                store.put(session);
+            }
+        };
+        tx.oncomplete = () => {
+            loadHistory();
+        };
+    }
+}
+
 function startNewSession() {
     currentSessionId = null;
     finalTranscript = '';
@@ -498,6 +554,21 @@ function updateStorageUsage(bytes) {
 // --- Splash & Pre-init Logic ---
 async function startSplashAndInit() {
     const splashScreen = document.getElementById('splashScreen');
+    
+    // --- Mobile Checking ---
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+        document.getElementById('rightPanel')?.classList.add('hidden');
+        document.getElementById('tabRealtimeAI')?.classList.add('hidden');
+        document.getElementById('realtimeAiToggle')?.closest('label')?.classList.add('hidden');
+        document.getElementById('settingsBtn')?.classList.add('hidden');
+        document.getElementById('currentModelDisplay')?.classList.add('hidden');
+        
+        splashScreen.classList.add('opacity-0');
+        setTimeout(() => splashScreen.remove(), 700);
+        return; // Early return, do not load WebLLM on mobile
+    }
+
     const splashLoadingArea = document.getElementById('splashLoadingArea');
     const splashProgressBar = document.getElementById('splashProgressBar');
     const splashStatusText = document.getElementById('splashStatusText');
@@ -600,8 +671,8 @@ async function startSplashAndInit() {
         setTimeout(() => splashScreen.remove(), 700);
     } catch (err) {
         console.error("Splash Init Error:", err);
-        if (modelName.includes('gemma-4-')) {
-            splashStatusText.innerText = `現在モデルの読み込みに対応待ちです（${modelName.includes('e4b') ? 'Gemma 4 E4B' : 'Gemma 4 E2B'}）。`;
+        if (modelName.includes('Llama-3.2')) {
+            splashStatusText.innerText = `現在モデルの読み込みに対応待ちです。`;
             splashSubtext.innerText = "WebLLMの最新バージョンへのアップデートをお待ちください。";
             splashLoadingArea.classList.remove('opacity-0');
             splashChangeModelBtn.classList.add('animate-bounce', 'text-blue-400', 'border-blue-400');
@@ -844,8 +915,8 @@ async function generateSummary() {
     try {
         // Initialize or Reload Engine if model changed
         if (!engine || engine.activeModel !== modelName) {
-            const isLargeModel = modelName.includes('9b');
-            const sizeEstimate = isLargeModel ? "約5GB" : "約1.5GB";
+            const isLargeModel = modelName.includes('3B') || modelName.includes('2b');
+            const sizeEstimate = isLargeModel ? "約2〜3GB" : "約1GB";
 
             loadingTitle.innerText = "モデルを読み込み中...";
             progressContainer.classList.remove('hidden');
@@ -957,13 +1028,13 @@ async function generateSummary() {
         
         let errorMsg = error.message || String(error);
         let isCrash = errorMsg.includes("Device was lost") || errorMsg.includes("Instance") || errorMsg.includes("disposed") || errorMsg.includes("memory");
-        let isUnsupported = modelName.includes('gemma-4-') && errorMsg.includes("not found");
+        let isUnsupported = modelName.includes('Llama-3.2') && errorMsg.includes("not found");
         
         const summaryDisplay = document.getElementById('summaryDisplay');
         summaryDisplay.innerHTML = `
             <div class="bg-red-900/20 border border-red-800 p-5 rounded-lg text-red-200">
                 <h3 class="font-bold text-lg mb-3 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-6 h-6 text-red-500"></i> AI処理エラー</h3>
-                <p class="text-sm mb-4 leading-relaxed">${isUnsupported ? `現在モデルの読み込みに対応待ちです（${modelName.includes('e4b') ? 'Gemma 4 E4B' : 'Gemma 4 E2B'}）。WebLLMのアップデートをお待ちください。` : (isCrash ? "メモリ不足によりAIエンジンがクラッシュしました。" : errorMsg)}</p>
+                <p class="text-sm mb-4 leading-relaxed">${isUnsupported ? `現在モデルの読み込みに対応待ちです。WebLLMのアップデートをお待ちください。` : (isCrash ? "メモリ不足によりAIエンジンがクラッシュしました。" : errorMsg)}</p>
                 <div class="bg-red-950/50 p-4 rounded border border-red-900/50 text-sm text-red-300 space-y-2">
                     <p class="font-bold text-red-400">【解決方法】</p>
                     <p>1. 画面右上の「WebLLM 設定」を開く</p>
@@ -985,8 +1056,8 @@ async function generateSummary() {
 }
 
 async function processRealtimeAI() {
-    // Increase buffer requirement to 40 chars to reduce frequency of AI calls and improve performance
-    if (!engine || isRealtimeProcessing || realtimeAiBuffer.length < 40) return;
+    // Increase buffer requirement to 80 chars to group into better sessions
+    if (!engine || isRealtimeProcessing || realtimeAiBuffer.length < 80) return;
     
     const isRealtimeEnabled = document.getElementById('realtimeAiToggle');
     if (isRealtimeEnabled && !isRealtimeEnabled.checked) {
@@ -1000,21 +1071,21 @@ async function processRealtimeAI() {
     
     try {
         const prompt = `あなたは優秀な会議アシスタントです。
-以下の「最新の文字起こし」を、これまでの会話の流れ（文脈）を考慮して整理してください。
-フィラーの除去だけでなく、前後のつながりから誤字を推測して修正し、重要なポイントを簡潔な箇条書きで出力してください。
-※出力する際は、各箇条書きの項目ごとに必ず改行（\\n）を入れて、視覚的に見やすくしてください。
+以下の「最新の文字起こし段落」の内容をサマリーとして要約し、重要なポイントを箇条書きで整理してください。
+フィラー（えーと、あの等）は除去し、文脈から誤字を適宜補正して見やすくしてください。
+※出力する際は、各箇条書きの項目ごとに必ず改行（\\n）を入れてください。
 
---- 最新の文字起こし ---
+--- 最新の文字起こし段落 ---
 ${textToProcess}
 
---- リアルタイム議事録 ---`;
+--- サマリー ---`;
 
         const messages = [{ role: "user", content: prompt }];
         const chunks = await engine.chat.completions.create({ 
             messages, 
             stream: true,
             temperature: 0.3, // Lower temperature for more stable real-time output
-            max_tokens: 256
+            max_tokens: 512
         });
 
         const realtimeDisplay = document.getElementById('realtimeAiDisplay');
@@ -1022,23 +1093,31 @@ ${textToProcess}
         if (placeholder) placeholder.classList.add('hidden');
         realtimeDisplay.classList.remove('hidden');
 
+        // Create new session block
+        const sessionBlock = document.createElement('div');
+        sessionBlock.className = 'mb-5 pb-5 border-b border-emerald-800/30 last:border-b-0';
+        const sessionTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        sessionBlock.innerHTML = `<div class="text-xs font-bold text-emerald-500/70 mb-2 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> ${sessionTime} セッション要約</div><div class="content whitespace-pre-wrap break-words text-emerald-100 leading-relaxed text-sm"></div>`;
+        realtimeDisplay.appendChild(sessionBlock);
+        lucide.createIcons();
+        
+        const contentDiv = sessionBlock.querySelector('.content');
+
         let reply = "";
         for await (const chunk of chunks) {
             const content = chunk.choices[0]?.delta?.content || "";
             reply += content;
-            // Append to existing content instead of overwriting to keep history
             if (content) {
-                realtimeDisplay.innerText += content;
+                contentDiv.innerText = reply;
                 realtimeDisplay.parentElement.scrollTop = realtimeDisplay.parentElement.scrollHeight;
             }
         }
-        realtimeDisplay.innerText += '\n'; // Add newline for next segment
     } catch (e) {
         console.warn("Real-time AI Error:", e);
     } finally {
         isRealtimeProcessing = false;
         // If buffer grew while processing, trigger again
-        if (realtimeAiBuffer.length >= 20) {
+        if (realtimeAiBuffer.length >= 80) {
             setTimeout(processRealtimeAI, 1000);
         }
     }

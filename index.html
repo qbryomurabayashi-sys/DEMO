@@ -1,392 +1,457 @@
 <!DOCTYPE html>
 <html lang="ja" translate="no">
-<head>
+  <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Local AI Meeting Assistant (WebLLM)</title>
-    
+    <title>ローカルAI議事録アシスタント (WebLLM)</title>
+
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0f172a">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="AI議事録">
-    <link rel="apple-touch-icon" href="/icon-192.png">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
-    
+
     <!-- Tailwind CSS & Lucide Icons -->
     <link rel="stylesheet" href="/src/index.css">
     <script src="https://unpkg.com/lucide@latest"></script>
-    
     <style>
-        body { -webkit-font-smoothing: antialiased; }
-        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
-        
-        .recording-pulse {
-            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+      body {
+        -webkit-font-smoothing: antialiased;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: #1e293b;
+        border-radius: 4px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #475569;
+        border-radius: 4px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #64748b;
+      }
+      .recording-pulse {
+        animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+      }
+      @keyframes pulse-ring {
+        0% {
+          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
         }
-        @keyframes pulse-ring {
-            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        70% {
+          box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
         }
+        100% {
+          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+        }
+      }
     </style>
-</head>
-<body class="bg-slate-900 text-slate-200 h-screen flex flex-col font-sans overflow-hidden">
+    <link rel="apple-touch-icon" href="/apple-icon-180.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2048-2732.jpg" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2732-2048.jpg" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1668-2388.jpg" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2388-1668.jpg" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1536-2048.jpg" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2048-1536.jpg" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1640-2360.jpg" media="(device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2360-1640.jpg" media="(device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1668-2224.jpg" media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2224-1668.jpg" media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1620-2160.jpg" media="(device-width: 810px) and (device-height: 1080px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2160-1620.jpg" media="(device-width: 810px) and (device-height: 1080px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1488-2266.jpg" media="(device-width: 744px) and (device-height: 1133px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2266-1488.jpg" media="(device-width: 744px) and (device-height: 1133px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1320-2868.jpg" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2868-1320.jpg" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1206-2622.jpg" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2622-1206.jpg" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1260-2736.jpg" media="(device-width: 420px) and (device-height: 912px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2736-1260.jpg" media="(device-width: 420px) and (device-height: 912px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1290-2796.jpg" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2796-1290.jpg" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1179-2556.jpg" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2556-1179.jpg" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1170-2532.jpg" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2532-1170.jpg" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1284-2778.jpg" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2778-1284.jpg" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1125-2436.jpg" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2436-1125.jpg" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1242-2688.jpg" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2688-1242.jpg" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-828-1792.jpg" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1792-828.jpg" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1242-2208.jpg" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-2208-1242.jpg" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-750-1334.jpg" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1334-750.jpg" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-640-1136.jpg" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/apple-splash-1136-640.jpg" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+  </head>
+  <body class="bg-slate-900 text-slate-200 h-screen flex flex-col font-sans overflow-hidden">
 
     <!-- Splash Screen / Loading Overlay -->
     <div id="splashScreen" class="fixed inset-0 bg-slate-950 z-[100] flex flex-col items-center justify-center p-6 transition-opacity duration-700">
-        <div class="mb-12 flex flex-col items-center animate-in fade-in zoom-in duration-1000">
-            <div class="bg-blue-600 p-5 rounded-3xl mb-6 shadow-2xl shadow-blue-500/20 relative">
-                <i data-lucide="mic-2" class="w-16 h-16 text-white"></i>
-                <div class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-4 border-slate-950 animate-pulse"></div>
-            </div>
-            <h1 class="text-3xl font-bold text-white tracking-tight mb-2">Local AI Meeting Assistant</h1>
-            <div class="flex items-center gap-2 text-slate-500 text-sm font-medium">
-                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span id="splashSubtext">セキュアなローカル環境を初期化中...</span>
-            </div>
+      <div class="mb-12 flex flex-col items-center animate-in fade-in zoom-in duration-1000">
+        <div class="bg-blue-600 p-5 rounded-3xl mb-6 shadow-2xl shadow-blue-500/20 relative">
+          <i data-lucide="mic-2" class="w-16 h-16 text-white"></i>
+          <div class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-4 border-slate-950 animate-pulse"></div>
         </div>
-        
-        <div id="splashLoadingArea" class="w-full max-w-sm space-y-4 opacity-0 transition-opacity duration-500">
-            <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden shadow-inner">
-                <div id="splashProgressBar" class="bg-blue-500 h-full transition-all duration-300 shadow-[0_0_10px_rgba(59,130,246,0.5)]" style="width: 0%"></div>
-            </div>
-            <div class="flex justify-between items-center text-[10px] font-mono tracking-widest text-slate-500 uppercase">
-                <div class="flex flex-col gap-1">
-                    <span id="splashStatusText">キャッシュを確認中...</span>
-                    <span id="splashTimeRemaining" class="text-blue-400/70 lowercase normal-case"></span>
-                </div>
-                <span id="splashPercentText">0%</span>
-            </div>
-            <div class="pt-4 flex flex-col items-center gap-2">
-                <button id="splashChangeModelBtn" class="text-[10px] text-slate-500 hover:text-blue-400 transition border border-slate-800 px-3 py-1.5 rounded-full uppercase tracking-widest font-bold bg-slate-900/50">
-                    モデルを変更する (軽量版など)
-                </button>
-                <p class="text-[9px] text-slate-600 text-center max-w-[200px]">※100%で停止・クラッシュする場合は、軽量モデル（1B）をお試しください。</p>
-            </div>
+        <h1 class="text-3xl font-bold text-white tracking-tight mb-2">ローカルAI議事録アシスタント</h1>
+        <div class="flex items-center gap-2 text-slate-500 text-sm font-medium">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span id="splashSubtext">セキュアなローカル環境を初期化中...</span>
         </div>
-
-        <div class="absolute bottom-10 text-slate-600 text-[10px] tracking-widest uppercase font-bold flex items-center gap-4">
-            <span>WebGPU 加速</span>
-            <span class="w-1 h-1 rounded-full bg-slate-700"></span>
-            <span>プライバシー保護 100%</span>
-            <span class="w-1 h-1 rounded-full bg-slate-700"></span>
-            <span>オープンソース</span>
+      </div>
+      <div id="splashLoadingArea" class="w-full max-w-sm space-y-4 opacity-0 transition-opacity duration-500">
+        <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden shadow-inner">
+          <div id="splashProgressBar" class="bg-blue-500 h-full transition-all duration-300 shadow-[0_0_10px_rgba(59,130,246,0.5)]" style="width: 0%"></div>
         </div>
+        <div class="flex justify-between items-center text-[10px] font-mono tracking-widest text-slate-500 uppercase">
+          <div class="flex flex-col gap-1">
+            <span id="splashStatusText">キャッシュを確認中...</span>
+            <span id="splashTimeRemaining" class="text-blue-400/70 lowercase normal-case"></span>
+          </div>
+          <span id="splashPercentText">0%</span>
+        </div>
+        <div class="pt-4 flex flex-col items-center gap-2">
+          <button id="splashChangeModelBtn" class="text-[10px] text-slate-500 hover:text-blue-400 transition border border-slate-800 px-3 py-1.5 rounded-full uppercase tracking-widest font-bold bg-slate-900/50">
+            モデルを変更する (軽量版など)
+          </button>
+          <p class="text-[9px] text-slate-600 text-center max-w-[200px]">※100%で停止・クラッシュする場合は、軽量モデル（1B）をお試しください。</p>
+        </div>
+      </div>
+      <div class="absolute bottom-10 text-slate-600 text-[10px] tracking-widest font-bold flex items-center gap-4">
+        <span>WebGPU 加速</span>
+        <span class="w-1 h-1 rounded-full bg-slate-700"></span>
+        <span>プライバシー保護 100%</span>
+        <span class="w-1 h-1 rounded-full bg-slate-700"></span>
+        <span>オープンソース</span>
+      </div>
     </div>
 
     <!-- Header -->
     <header class="bg-slate-950 border-b border-slate-800 px-6 py-4 flex justify-between items-center shrink-0 shadow-md z-20">
-        <div class="flex items-center gap-3">
-            <button id="toggleSidebarBtn" class="p-2 text-slate-400 hover:text-white bg-slate-800 rounded-md lg:hidden">
-                <i data-lucide="menu" class="w-5 h-5"></i>
-            </button>
-            <div class="bg-blue-600 p-2 rounded-lg hidden sm:block">
-                <i data-lucide="mic-2" class="w-5 h-5 text-white"></i>
-            </div>
-            <h1 class="text-lg font-bold text-slate-100 tracking-wide">Local AI Meeting Assistant</h1>
-            <span class="bg-slate-800 text-emerald-400 text-[10px] px-2 py-1 rounded border border-slate-700 font-mono ml-2 hidden sm:flex items-center gap-1">
+      <div class="flex items-center gap-3">
+        <button id="toggleSidebarBtn" class="p-2 text-slate-400 hover:text-white bg-slate-800 rounded-md lg:hidden">
+          <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
+        <div class="bg-blue-600 p-2 rounded-lg hidden sm:block">
+          <i data-lucide="mic-2" class="w-5 h-5 text-white"></i>
+        </div>
+        <h1 class="text-lg font-bold text-slate-100 tracking-wide">ローカルAI議事録</h1>
+        <span class="bg-slate-800 text-emerald-400 text-[10px] px-2 py-1 rounded border border-slate-700 font-mono ml-2 hidden sm:flex items-center gap-1">
                 <i data-lucide="zap" class="w-3 h-3"></i> WebGPU Powered
             </span>
-            <span id="currentModelDisplay" class="bg-blue-900/50 text-blue-300 text-[10px] px-3 py-1 rounded-full border border-blue-700/50 font-bold ml-2 hidden sm:flex items-center gap-1 shadow-[0_0_8px_rgba(59,130,246,0.2)]">
-                <i data-lucide="cpu" class="w-3 h-3"></i> <span id="currentModelName">Loading...</span>
-            </span>
-        </div>
-        <div class="flex items-center gap-4">
-            <button id="settingsBtn" class="flex items-center gap-2 text-slate-400 hover:text-white transition bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-md border border-slate-700 text-sm">
-                <i data-lucide="settings" class="w-4 h-4"></i> WebLLM 設定
-            </button>
-        </div>
+        <span id="currentModelDisplay" class="bg-blue-900/50 text-blue-300 text-[10px] px-3 py-1 rounded-full border border-blue-700/50 font-bold ml-2 hidden sm:flex items-center gap-1 shadow-[0_0_8px_rgba(59,130,246,0.2)]">
+                <i data-lucide="cpu" class="w-3 h-3"></i> <span id="currentModelName">読み込み中...</span>
+        </span>
+      </div>
+      <div class="flex items-center gap-4">
+        <button id="settingsBtn" class="flex items-center gap-2 text-slate-400 hover:text-white transition bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-md border border-slate-700 text-sm">
+          <i data-lucide="settings" class="w-4 h-4"></i> WebLLM 設定
+        </button>
+      </div>
     </header>
 
     <!-- Main Content Container -->
     <div class="flex-1 flex overflow-hidden relative">
-        
-        <!-- Sidebar: History -->
-        <aside id="sidebar" class="fixed inset-y-0 left-0 w-72 bg-slate-950 border-r border-slate-800 z-30 transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 flex flex-col">
-            <div class="p-4 border-b border-slate-800 flex justify-between items-center">
-                <span class="text-xs font-bold text-slate-500 tracking-widest uppercase">Saved Sessions</span>
-                <div class="flex items-center gap-1">
-                    <button id="newSessionBtn" class="p-1.5 text-blue-400 hover:bg-blue-900/30 rounded-md transition" title="新規セッション">
-                        <i data-lucide="plus-circle" class="w-5 h-5"></i>
-                    </button>
-                    <button id="closeSidebarBtn" class="p-1.5 text-slate-500 hover:text-white lg:hidden">
-                        <i data-lucide="chevron-left" class="w-5 h-5"></i>
-                    </button>
-                </div>
-            </div>
-            <div id="historyList" class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                <!-- History items will be injected here -->
-                <div class="text-center py-10 text-slate-600 text-xs italic">保存されたデータはありません</div>
-            </div>
-            <div class="p-4 border-t border-slate-800 bg-slate-900/50">
-                <div class="flex items-center justify-between text-[10px] text-slate-500 mb-2">
-                    <span>STORAGE USAGE</span>
-                    <span id="storageUsageText">0 MB</span>
-                </div>
-                <div class="w-full bg-slate-800 rounded-full h-1 overflow-hidden">
-                    <div id="storageUsageBar" class="bg-blue-600 h-full" style="width: 0%"></div>
-                </div>
-            </div>
-        </aside>
 
-        <!-- Main Content -->
-        <main class="flex-1 flex flex-col lg:flex-row overflow-hidden p-4 sm:p-6 gap-6">
-        
+      <!-- Sidebar: History -->
+      <aside id="sidebar" class="fixed inset-y-0 left-0 w-72 bg-slate-950 border-r border-slate-800 z-30 transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 flex flex-col">
+        <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+          <span class="text-xs font-bold text-slate-500 tracking-widest uppercase">保存されたセッション</span>
+          <div class="flex items-center gap-1">
+            <button id="newSessionBtn" class="p-1.5 text-blue-400 hover:bg-blue-900/30 rounded-md transition" title="新規セッション">
+              <i data-lucide="plus-circle" class="w-5 h-5"></i>
+            </button>
+            <button id="closeSidebarBtn" class="p-1.5 text-slate-500 hover:text-white lg:hidden">
+              <i data-lucide="chevron-left" class="w-5 h-5"></i>
+            </button>
+          </div>
+        </div>
+        <div id="historyList" class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+
+          <!-- History items will be injected here -->
+          <div class="text-center py-10 text-slate-600 text-xs italic">保存されたデータはありません</div>
+        </div>
+        <div class="p-4 border-t border-slate-800 bg-slate-900/50">
+          <div class="flex items-center justify-between text-[10px] text-slate-500 mb-2">
+            <span class="text-xs font-bold text-slate-500 tracking-widest uppercase">ストレージ使用量</span>
+            <span id="storageUsageText">0 MB</span>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-1 overflow-hidden">
+            <div id="storageUsageBar" class="bg-blue-600 h-full" style="width: 0%"></div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="flex-1 flex flex-col lg:flex-row overflow-hidden p-4 sm:p-6 gap-6">
+
         <!-- Left Panel: Audio Capture & Transcription -->
         <section class="flex-1 flex flex-col bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden w-full lg:w-1/2">
-            <!-- Control Bar -->
-            <div class="p-5 border-b border-slate-700 bg-slate-800/50 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between shrink-0">
-                <div class="flex items-center gap-2 w-full sm:w-auto">
-                    <select id="micSelect" class="flex-1 sm:w-56 bg-slate-900 border border-slate-600 rounded-md px-4 py-3 text-base text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"></select>
-                    <button id="refreshMicBtn" class="p-3 text-slate-400 hover:text-white bg-slate-900 border border-slate-600 rounded-md transition" title="マイク更新">
-                        <i data-lucide="refresh-cw" class="w-5 h-5"></i>
-                    </button>
+
+          <!-- Control Bar -->
+          <div class="p-5 border-b border-slate-700 bg-slate-800/50 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between shrink-0">
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+              <select id="micSelect" class="flex-1 sm:w-56 bg-slate-900 border border-slate-600 rounded-md px-4 py-3 text-base text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"></select>
+              <button id="refreshMicBtn" class="p-3 text-slate-400 hover:text-white bg-slate-900 border border-slate-600 rounded-md transition" title="マイク更新">
+                <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+              </button>
+            </div>
+            <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+
+              <!-- Realtime AI Toggle -->
+              <label class="flex items-center gap-2 cursor-pointer mr-2 group shrink-0" title="録音中のリアルタイムAI解析（重い場合はオフにしてください）">
+                <div class="relative">
+                  <input type="checkbox" id="realtimeAiToggle" class="sr-only peer" checked="">
+                  <div class="block bg-slate-700 w-10 h-6 rounded-full transition-colors duration-300 peer-checked:bg-emerald-500"></div>
+                  <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 transform peer-checked:translate-x-4"></div>
                 </div>
-                <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
-                    <!-- Realtime AI Toggle -->
-                    <label class="flex items-center gap-2 cursor-pointer mr-2 group shrink-0" title="録音中のリアルタイムAI解析（重い場合はオフにしてください）">
-                        <div class="relative">
-                            <input type="checkbox" id="realtimeAiToggle" class="sr-only peer" checked>
-                            <div class="block bg-slate-700 w-10 h-6 rounded-full transition-colors duration-300 peer-checked:bg-emerald-500"></div>
-                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 transform peer-checked:translate-x-4"></div>
-                        </div>
-                        <span class="text-xs font-bold text-slate-400 group-hover:text-slate-200 transition flex items-center gap-1 whitespace-nowrap">
+                <span class="text-xs font-bold text-slate-400 group-hover:text-slate-200 transition flex items-center gap-1 whitespace-nowrap">
                             <i data-lucide="zap" class="w-3 h-3"></i> リアルタイムAI
                         </span>
-                    </label>
-
-                    <div class="bg-slate-900 px-4 py-3 rounded-md border border-slate-700 flex items-center gap-3 min-w-[120px] justify-center">
-                        <div id="recIndicator" class="w-3 h-3 rounded-full bg-slate-600"></div>
-                        <span id="timerDisplay" class="font-mono text-lg text-slate-300">00:00:00</span>
-                    </div>
-                    <button id="recBtn" class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-md font-bold text-lg transition shadow-sm w-full sm:w-auto">
-                        <i data-lucide="mic" class="w-5 h-5"></i> <span id="recBtnText">録音開始</span>
-                    </button>
-                </div>
+              </label>
+              <div class="bg-slate-900 px-4 py-3 rounded-md border border-slate-700 flex items-center gap-3 min-w-[120px] justify-center">
+                <div id="recIndicator" class="w-3 h-3 rounded-full bg-slate-600"></div>
+                <span id="timerDisplay" class="font-mono text-lg text-slate-300">00:00:00</span>
+              </div>
+              <button id="recBtn" class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-md font-bold text-lg transition shadow-sm w-full sm:w-auto">
+                <i data-lucide="mic" class="w-5 h-5"></i> <span id="recBtnText">録音開始</span>
+              </button>
             </div>
-            
-            <!-- Error Area -->
-            <div id="sysErrorArea" class="hidden bg-red-900/50 border-b border-red-800 text-red-200 text-sm p-4 flex gap-3 shrink-0">
-                <i data-lucide="alert-triangle" class="w-5 h-5 shrink-0"></i><span id="sysErrorText" class="leading-relaxed"></span>
-            </div>
+          </div>
 
-            <!-- Transcription Log -->
-            <div class="bg-slate-900/50 px-5 py-3 border-b border-slate-700 flex justify-between items-center shrink-0">
-                <span class="text-sm font-bold text-slate-400 tracking-wider flex items-center gap-2">
+          <!-- Error Area -->
+          <div id="sysErrorArea" class="hidden bg-red-900/50 border-b border-red-800 text-red-200 text-sm p-4 flex gap-3 shrink-0">
+            <i data-lucide="alert-triangle" class="w-5 h-5 shrink-0"></i><span id="sysErrorText" class="leading-relaxed"></span>
+          </div>
+
+          <!-- Transcription Log -->
+          <div class="bg-slate-900/50 px-5 py-3 border-b border-slate-700 flex justify-between items-center shrink-0">
+            <span class="text-sm font-bold text-slate-400 tracking-wider flex items-center gap-2">
                     <i data-lucide="align-left" class="w-5 h-5"></i> 文字起こし (自動保存)
                 </span>
-                <div class="flex gap-3">
-                    <button id="downloadTransBtn" class="text-slate-400 hover:text-white transition disabled:opacity-30 flex items-center gap-1 text-sm" title="テキストを保存" disabled>
-                        <i data-lucide="save" class="w-5 h-5"></i> <span class="hidden sm:inline">テキスト保存</span>
-                    </button>
-                    <button id="downloadAudioBtn" class="text-slate-400 hover:text-white transition disabled:opacity-30 flex items-center gap-1 text-sm" title="音声(MP3)ダウンロード" disabled>
-                        <i data-lucide="download" class="w-5 h-5"></i> <span class="hidden sm:inline">音声保存</span>
-                    </button>
-                    <button id="clearDataBtn" class="text-slate-400 hover:text-red-400 transition ml-2 flex items-center gap-1 text-sm" title="データ消去">
-                        <i data-lucide="trash-2" class="w-5 h-5"></i> <span class="hidden sm:inline">消去</span>
-                    </button>
-                </div>
+            <div class="flex gap-3">
+              <button id="downloadTransBtn" class="text-slate-400 hover:text-white transition disabled:opacity-30 flex items-center gap-1 text-sm" title="テキストを保存" disabled="">
+                <i data-lucide="save" class="w-5 h-5"></i> <span class="hidden sm:inline">テキスト保存</span>
+              </button>
+              <button id="downloadAudioBtn" class="text-slate-400 hover:text-white transition disabled:opacity-30 flex items-center gap-1 text-sm" title="音声(MP3)ダウンロード" disabled="">
+                <i data-lucide="download" class="w-5 h-5"></i> <span class="hidden sm:inline">音声保存</span>
+              </button>
+              <button id="clearDataBtn" class="text-slate-400 hover:text-red-400 transition ml-2 flex items-center gap-1 text-sm" title="データ消去">
+                <i data-lucide="trash-2" class="w-5 h-5"></i> <span class="hidden sm:inline">消去</span>
+              </button>
+            </div>
+          </div>
+          <div id="terminalContainer" class="flex-1 flex flex-col overflow-hidden bg-slate-900">
+
+            <!-- Tabs for Left Panel -->
+            <div class="flex border-b border-slate-800 bg-slate-950/50 shrink-0">
+              <button id="tabTranscription" class="flex-1 py-3 px-4 text-xs font-bold tracking-widest border-b-2 border-blue-500 text-blue-400 bg-slate-900/50 transition">
+                文字起こし (全体)
+              </button>
+              <button id="tabRealtimeAI" class="flex-1 py-3 px-4 text-xs font-bold tracking-widest border-b-2 border-transparent text-slate-500 hover:text-emerald-400 transition flex items-center justify-center gap-2">
+                <i data-lucide="zap" class="w-3 h-3"></i> リアルタイムAI
+              </button>
             </div>
 
-            <div id="terminalContainer" class="flex-1 flex flex-col overflow-hidden bg-slate-900">
-                <!-- Tabs for Left Panel -->
-                <div class="flex border-b border-slate-800 bg-slate-950/50 shrink-0">
-                    <button id="tabTranscription" class="flex-1 py-3 px-4 text-xs font-bold tracking-widest uppercase border-b-2 border-blue-500 text-blue-400 bg-slate-900/50 transition">
-                        Raw Log
-                    </button>
-                    <button id="tabRealtimeAI" class="flex-1 py-3 px-4 text-xs font-bold tracking-widest uppercase border-b-2 border-transparent text-slate-500 hover:text-emerald-400 transition flex items-center justify-center gap-2">
-                        <i data-lucide="zap" class="w-3 h-3"></i> Real-time AI
-                    </button>
-                </div>
-
-                <!-- Transcription View -->
-                <div id="viewTranscription" class="flex-1 p-6 overflow-y-auto custom-scrollbar text-slate-200 leading-relaxed text-base">
-                    <div id="transcriptionPlaceholder" class="text-slate-500 flex flex-col items-center justify-center h-full opacity-60">
-                        <i data-lucide="mic-off" class="w-16 h-16 mb-4"></i>
-                        <p class="text-lg font-bold mb-2">録音待機中...</p>
-                        <p class="text-sm">上の「録音開始」ボタンを押して話してください。</p>
-                    </div>
-                    <div id="transcriptionDisplay" class="whitespace-pre-wrap break-words"></div>
-                    <div id="interimDisplay" class="text-slate-500 italic mt-2"></div>
-                </div>
-
-                <!-- Real-time AI View -->
-                <div id="viewRealtimeAI" class="flex-1 p-6 overflow-y-auto custom-scrollbar text-emerald-100 leading-relaxed text-base hidden bg-emerald-950/10">
-                    <div id="realtimePlaceholder" class="text-emerald-800/50 flex flex-col items-center justify-center h-full">
-                        <i data-lucide="sparkles" class="w-16 h-16 mb-4 opacity-20"></i>
-                        <p class="text-lg font-bold mb-2">リアルタイムAI解析中...</p>
-                        <p class="text-sm">録音が始まると、ここにフィラーを除去した要約が表示されます。</p>
-                    </div>
-                    <div id="realtimeAiDisplay" class="whitespace-pre-wrap break-words hidden"></div>
-                </div>
+            <!-- Transcription View -->
+            <div id="viewTranscription" class="flex-1 p-6 overflow-y-auto custom-scrollbar text-slate-200 leading-relaxed text-base">
+              <div id="transcriptionPlaceholder" class="text-slate-500 flex flex-col items-center justify-center h-full opacity-60">
+                <i data-lucide="mic-off" class="w-16 h-16 mb-4"></i>
+                <p class="text-lg font-bold mb-2">録音待機中...</p>
+                <p class="text-sm">上の「録音開始」ボタンを押して話してください。</p>
+              </div>
+              <div id="transcriptionDisplay" class="whitespace-pre-wrap break-words"></div>
+              <div id="interimDisplay" class="text-slate-500 italic mt-2"></div>
             </div>
+
+            <!-- Real-time AI View -->
+            <div id="viewRealtimeAI" class="flex-1 p-6 overflow-y-auto custom-scrollbar text-emerald-100 leading-relaxed text-base hidden bg-emerald-950/10">
+              <div id="realtimePlaceholder" class="text-emerald-800/50 flex flex-col items-center justify-center h-full">
+                <i data-lucide="sparkles" class="w-16 h-16 mb-4 opacity-20"></i>
+                <p class="text-lg font-bold mb-2">リアルタイムAI解析中...</p>
+                <p class="text-sm">録音が始まると、ここにフィラーを除去した要約が表示されます。</p>
+              </div>
+              <div id="realtimeAiDisplay" class="whitespace-pre-wrap break-words hidden"></div>
+            </div>
+            
+            <!-- Manual Memo Input -->
+            <div class="p-3 border-t border-slate-700 bg-slate-800/80 shrink-0 relative flex gap-2 items-end">
+              <textarea id="manualMemoInput" placeholder="手打ちメモを入力... (追加するとAI議事録に反映されます)" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg py-2.5 px-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none h-12 custom-scrollbar"></textarea>
+              <button id="addMemoBtn" class="bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg transition" title="メモを追加">
+                <i data-lucide="send" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
         </section>
 
         <!-- Right Panel: AI Analysis -->
-        <section class="flex-1 flex flex-col bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden w-full lg:w-1/2">
-            <!-- Control Bar -->
-            <div class="p-5 border-b border-slate-700 bg-slate-800/50 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between shrink-0">
-                <div class="flex items-center gap-3 w-full sm:w-auto">
-                    <div class="bg-emerald-900/50 p-3 rounded-md border border-emerald-800/50">
-                        <i data-lucide="bot" class="w-5 h-5 text-emerald-400"></i>
-                    </div>
-                    <button id="showTasksBtn" class="flex-1 sm:w-64 bg-slate-900 border border-slate-600 rounded-md px-4 py-3 text-base text-slate-200 flex justify-between items-center hover:border-emerald-500 transition">
-                        <span class="font-bold">AI タスクを選択...</span>
-                        <i data-lucide="chevron-down" class="w-5 h-5 text-slate-500"></i>
-                    </button>
-                </div>
-                <button id="generateBtn" class="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-md font-bold text-lg transition shadow-sm disabled:opacity-50 w-full sm:w-auto">
-                    <i data-lucide="sparkles" class="w-5 h-5"></i> AI 実行
-                </button>
+        <section id="rightPanel" class="flex-1 flex flex-col bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden w-full lg:w-1/2">
+
+          <!-- Control Bar -->
+          <div class="p-5 border-b border-slate-700 bg-slate-800/50 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between shrink-0">
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+              <div class="bg-emerald-900/50 p-3 rounded-md border border-emerald-800/50">
+                <i data-lucide="bot" class="w-5 h-5 text-emerald-400"></i>
+              </div>
+              <button id="showTasksBtn" class="flex-1 sm:w-64 bg-slate-900 border border-slate-600 rounded-md px-4 py-3 text-base text-slate-200 flex justify-between items-center hover:border-emerald-500 transition">
+                <span class="font-bold">AI タスクを選択...</span>
+                <i data-lucide="chevron-down" class="w-5 h-5 text-slate-500"></i>
+              </button>
             </div>
-            
-            <!-- AI Output Area -->
-            <div class="bg-slate-900/50 px-5 py-3 border-b border-slate-700 flex justify-between items-center shrink-0">
-                <span class="text-sm font-bold text-slate-400 tracking-wider flex items-center gap-2">
+            <button id="generateBtn" class="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-md font-bold text-lg transition shadow-sm disabled:opacity-50 w-full sm:w-auto">
+              <i data-lucide="sparkles" class="w-5 h-5"></i> AI 実行
+            </button>
+          </div>
+
+          <!-- AI Output Area -->
+          <div class="bg-slate-900/50 px-5 py-3 border-b border-slate-700 flex justify-between items-center shrink-0">
+            <span class="text-sm font-bold text-slate-400 tracking-wider flex items-center gap-2">
                     <i data-lucide="file-text" class="w-5 h-5"></i> AI 出力結果
                 </span>
-                <div class="flex gap-3">
-                    <button id="downloadTextBtn" class="text-slate-400 hover:text-white transition disabled:opacity-30 hidden flex items-center gap-1 text-sm" title="テキストを保存">
-                        <i data-lucide="save" class="w-5 h-5"></i> <span class="hidden sm:inline">保存</span>
-                    </button>
-                    <button id="copyAiBtn" class="text-slate-400 hover:text-white transition disabled:opacity-30 hidden flex items-center gap-1 text-sm" title="結果をコピー">
-                        <i data-lucide="copy" class="w-5 h-5"></i> <span class="hidden sm:inline">コピー</span>
-                    </button>
-                </div>
+            <div class="flex gap-3">
+              <button id="downloadTextBtn" class="text-slate-400 hover:text-white transition disabled:opacity-30 hidden flex items-center gap-1 text-sm" title="テキストを保存">
+                <i data-lucide="save" class="w-5 h-5"></i> <span class="hidden sm:inline">保存</span>
+              </button>
+              <button id="copyAiBtn" class="text-slate-400 hover:text-white transition disabled:opacity-30 hidden flex items-center gap-1 text-sm" title="結果をコピー">
+                <i data-lucide="copy" class="w-5 h-5"></i> <span class="hidden sm:inline">コピー</span>
+              </button>
             </div>
+          </div>
+          <div class="flex-1 flex flex-col overflow-hidden bg-slate-900 relative">
 
-            <div class="flex-1 flex flex-col overflow-hidden bg-slate-900 relative">
-                <!-- Task Selection Overlay (New) -->
-                <div id="taskSelectionOverlay" class="absolute top-0 left-0 right-0 bg-slate-800/95 border-b border-slate-700 p-4 z-20 shadow-xl transform -translate-y-full transition-transform duration-300">
-                    <div class="flex flex-col gap-4">
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">AI Tasks (Multiple Possible)</span>
-                            <button id="hideTasksBtn" class="text-slate-400 hover:text-white"><i data-lucide="chevron-up" class="w-4 h-4"></i></button>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <label class="flex items-center gap-3 p-3 bg-slate-900 rounded-lg border border-slate-700 cursor-pointer hover:border-emerald-500 transition group">
-                                <input type="checkbox" name="aiTask" value="correction" class="w-4 h-4 rounded border-slate-600 text-emerald-600 focus:ring-emerald-500 bg-slate-800">
-                                <div class="flex flex-col">
-                                    <span class="text-sm font-bold text-slate-200 group-hover:text-emerald-400 transition">文字起こしの補正</span>
-                                    <span class="text-[10px] text-slate-500">文脈から誤字脱字をAIで修正します</span>
-                                </div>
-                            </label>
-                            <label class="flex items-center gap-3 p-3 bg-slate-900 rounded-lg border border-slate-700 cursor-pointer hover:border-emerald-500 transition group">
-                                <input type="checkbox" name="aiTask" value="context_doc" class="w-4 h-4 rounded border-slate-600 text-emerald-600 focus:ring-emerald-500 bg-slate-800">
-                                <div class="flex flex-col">
-                                    <span class="text-sm font-bold text-slate-200 group-hover:text-emerald-400 transition">文脈考慮・公式文書作成</span>
-                                    <span class="text-[10px] text-slate-500">前後の文脈を読み取り、正式な記録として整理します</span>
-                                </div>
-                            </label>
-                            <label class="flex items-center gap-3 p-3 bg-slate-900 rounded-lg border border-slate-700 cursor-pointer hover:border-emerald-500 transition group">
-                                <input type="checkbox" name="aiTask" value="minutes" class="w-4 h-4 rounded border-slate-600 text-emerald-600 focus:ring-emerald-500 bg-slate-800" checked>
-                                <div class="flex flex-col">
-                                    <span class="text-sm font-bold text-slate-200 group-hover:text-emerald-400 transition">議事録作成</span>
-                                    <span class="text-[10px] text-slate-500">決定事項やタスクを抽出</span>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
+            <!-- Task Selection Overlay (New) -->
+            <div id="taskSelectionOverlay" class="absolute top-0 left-0 right-0 bg-slate-800/95 border-b border-slate-700 p-4 z-20 shadow-xl transform -translate-y-full transition-transform duration-300">
+              <div class="flex flex-col gap-4">
+                <div class="flex justify-between items-center">
+                  <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">AI タスク (複数選択可)</span>
+                  <button id="hideTasksBtn" class="text-slate-400 hover:text-white"><i data-lucide="chevron-up" class="w-4 h-4"></i></button>
                 </div>
-
-                <div class="flex-1 p-5 overflow-y-auto custom-scrollbar text-slate-200 leading-relaxed text-sm relative">
-                    <div id="summaryPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 italic p-6 text-center">
-                        <i data-lucide="cpu" class="w-12 h-12 mb-4 opacity-30"></i>
-                        <p>録音完了後、右上の「AI 実行」をクリックしてください。</p>
-                        <p class="text-xs mt-3 text-slate-600">※処理はすべてブラウザ内（WebGPU）で完結します。</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label class="flex items-center gap-3 p-3 bg-slate-900 rounded-lg border border-slate-700 cursor-pointer hover:border-emerald-500 transition group">
+                    <input type="checkbox" name="aiTask" value="correction" class="w-4 h-4 rounded border-slate-600 text-emerald-600 focus:ring-emerald-500 bg-slate-800">
+                    <div class="flex flex-col">
+                      <span class="text-sm font-bold text-slate-200 group-hover:text-emerald-400 transition">文字起こしの補正</span>
+                      <span class="text-[10px] text-slate-500">文脈から誤字脱字をAIで修正します</span>
                     </div>
-                    
-                    <div id="summaryDisplay" class="hidden space-y-8 pb-10">
-                        <!-- AI Results will be injected here -->
+                  </label>
+                  <label class="flex items-center gap-3 p-3 bg-slate-900 rounded-lg border border-slate-700 cursor-pointer hover:border-emerald-500 transition group">
+                    <input type="checkbox" name="aiTask" value="context_doc" class="w-4 h-4 rounded border-slate-600 text-emerald-600 focus:ring-emerald-500 bg-slate-800">
+                    <div class="flex flex-col">
+                      <span class="text-sm font-bold text-slate-200 group-hover:text-emerald-400 transition">文脈考慮・公式文書作成</span>
+                      <span class="text-[10px] text-slate-500">前後の文脈を読み取り、正式な記録として整理します</span>
                     </div>
-                    
-                    <!-- Loading & Progress Indicator -->
-                    <div id="loadingIndicator" class="hidden absolute inset-0 bg-slate-900/90 backdrop-blur-sm flex-col items-center justify-center text-emerald-400 z-10 p-6 text-center">
-                        <i data-lucide="loader-2" class="w-10 h-10 animate-spin mb-4"></i>
-                        <span id="loadingTitle" class="text-sm font-bold tracking-wider mb-2">Local AI Processing...</span>
-                        
-                        <!-- Progress Bar Container -->
-                        <div id="downloadProgressContainer" class="w-full max-w-xs hidden flex flex-col items-center mt-4">
-                            <div class="w-full bg-slate-700 rounded-full h-2.5 mb-2 overflow-hidden">
-                                <div id="downloadProgressBar" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                            </div>
-                            <span id="downloadProgressText" class="text-xs text-slate-400 font-mono">0%</span>
-                        </div>
-                        
-                        <span id="loadingSubtext" class="text-xs text-slate-500 mt-4">ブラウザのWebGPUを使用して推論を行っています...</span>
+                  </label>
+                  <label class="flex items-center gap-3 p-3 bg-slate-900 rounded-lg border border-slate-700 cursor-pointer hover:border-emerald-500 transition group">
+                    <input type="checkbox" name="aiTask" value="minutes" class="w-4 h-4 rounded border-slate-600 text-emerald-600 focus:ring-emerald-500 bg-slate-800" checked="">
+                    <div class="flex flex-col">
+                      <span class="text-sm font-bold text-slate-200 group-hover:text-emerald-400 transition">議事録作成</span>
+                      <span class="text-[10px] text-slate-500">決定事項やタスクを抽出</span>
                     </div>
+                  </label>
                 </div>
+              </div>
             </div>
+            <div class="flex-1 p-5 overflow-y-auto custom-scrollbar text-slate-200 leading-relaxed text-sm relative">
+              <div id="summaryPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 italic p-6 text-center">
+                <i data-lucide="cpu" class="w-12 h-12 mb-4 opacity-30"></i>
+                <p>録音完了後、右上の「AI 実行」をクリックしてください。</p>
+                <p class="text-xs mt-3 text-slate-600">※処理はすべてブラウザ内（WebGPU）で完結します。</p>
+              </div>
+              <div id="summaryDisplay" class="hidden space-y-8 pb-10">
+
+                <!-- AI Results will be injected here -->
+              </div>
+
+              <!-- Loading & Progress Indicator -->
+              <div id="loadingIndicator" class="hidden absolute inset-0 bg-slate-900/90 backdrop-blur-sm flex-col items-center justify-center text-emerald-400 z-10 p-6 text-center">
+                <i data-lucide="loader-2" class="w-10 h-10 animate-spin mb-4"></i>
+                <span id="loadingTitle" class="text-sm font-bold tracking-wider mb-2">ローカルAI処理中...</span>
+
+                <!-- Progress Bar Container -->
+                <div id="downloadProgressContainer" class="w-full max-w-xs hidden flex flex-col items-center mt-4">
+                  <div class="w-full bg-slate-700 rounded-full h-2.5 mb-2 overflow-hidden">
+                    <div id="downloadProgressBar" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                  </div>
+                  <span id="downloadProgressText" class="text-xs text-slate-400 font-mono">0%</span>
+                </div>
+                <span id="loadingSubtext" class="text-xs text-slate-500 mt-4">ブラウザのWebGPUを使用して推論を行っています...</span>
+              </div>
+            </div>
+          </div>
         </section>
-    </main>
+      </main>
     </div>
 
     <!-- Settings Modal -->
     <div id="settingsModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-800 rounded-xl border border-slate-600 shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
-            <div class="px-6 py-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
-                <h2 class="font-bold text-lg text-slate-100 flex items-center gap-2">
-                    <i data-lucide="settings" class="w-5 h-5 text-blue-400"></i> WebLLM 設定
-                </h2>
-                <button id="closeSettingsBtn" class="text-slate-400 hover:text-white transition"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            <div class="p-6 space-y-5">
-                <div>
-                    <label class="block text-sm font-bold text-slate-300 mb-1">AIモデル選択 (速度 vs 精度)</label>
-                    <select id="modelNameInput" class="w-full bg-slate-900 border border-slate-600 rounded-md px-4 py-2.5 text-sm text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition font-mono">
-                        <option value="gemma-4-e4b-it-q4f16_1-MLC">🎙️ Gemma 4 E4B (音声ネイティブ・高精度) - デフォルト</option>
-                        <option value="gemma-4-E2B-it-q4f16_1-MLC">⚡ Gemma 4 E2B (音声ネイティブ・軽量)</option>
-                    </select>
-                    <p class="text-xs text-slate-500 mt-1.5">※初回実行時にブラウザのキャッシュにモデルがダウンロードされます。</p>
-                </div>
-                <div class="bg-emerald-900/20 border border-emerald-700/50 rounded-md p-4 text-xs text-emerald-200 leading-relaxed">
-                    <strong class="flex items-center gap-1 mb-1 text-emerald-400"><i data-lucide="info" class="w-4 h-4"></i> WebGPUについて</strong>
-                    このアプリは外部サーバーやOllamaを一切使用せず、お使いのデバイスのGPU（WebGPU）を使用してブラウザ内で直接AIを動かします。データが外部に送信されることはなく、プライバシーは完全に保護されます。
-                </div>
-            </div>
-            <div class="px-6 py-4 border-t border-slate-700 bg-slate-800/50 flex justify-end">
-                <button id="saveSettingsBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md text-sm font-bold transition shadow-sm">保存して閉じる</button>
-            </div>
+      <div class="bg-slate-800 rounded-xl border border-slate-600 shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+        <div class="px-6 py-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
+          <h2 class="font-bold text-lg text-slate-100 flex items-center gap-2">
+            <i data-lucide="settings" class="w-5 h-5 text-blue-400"></i> WebLLM 設定
+          </h2>
+          <button id="closeSettingsBtn" class="text-slate-400 hover:text-white transition"><i data-lucide="x" class="w-5 h-5"></i></button>
         </div>
+        <div class="p-6 space-y-5">
+          <div>
+            <label class="block text-sm font-bold text-slate-300 mb-1">AIモデル選択 (速度 vs 精度)</label>
+            <select id="modelNameInput" class="w-full bg-slate-900 border border-slate-600 rounded-md px-4 py-2.5 text-sm text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition font-mono">
+              <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">🎙️ Llama 3.2 3B (標準・高精度) - デフォルト</option>
+              <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">⚡ Llama 3.2 1B (高速・軽量)</option>
+              <option value="gemma-2-2b-it-q4f16_1-MLC">🧠 Gemma 2 2B (バランス)</option>
+            </select>
+            <p class="text-xs text-slate-500 mt-1.5">※初回実行時にブラウザのキャッシュにモデルがダウンロードされます。</p>
+          </div>
+          <div class="bg-emerald-900/20 border border-emerald-700/50 rounded-md p-4 text-xs text-emerald-200 leading-relaxed">
+            <strong class="flex items-center gap-1 mb-1 text-emerald-400"><i data-lucide="info" class="w-4 h-4"></i> WebGPUについて</strong>
+            このアプリは外部サーバーやOllamaを一切使用せず、お使いのデバイスのGPU（WebGPU）を使用してブラウザ内で直接AIを動かします。データが外部に送信されることはなく、プライバシーは完全に保護されます。
+          </div>
+        </div>
+        <div class="px-6 py-4 border-t border-slate-700 bg-slate-800/50 flex justify-end">
+          <button id="saveSettingsBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md text-sm font-bold transition shadow-sm">保存して閉じる</button>
+        </div>
+      </div>
     </div>
 
     <!-- PWA Modals -->
+
     <!-- LINE Browser Warning Modal -->
     <div id="lineWarningModal" class="fixed inset-0 bg-slate-950/90 z-[200] hidden flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 class="text-xl font-bold text-red-400 mb-3 flex items-center gap-2"><i data-lucide="alert-triangle"></i> ブラウザ推奨</h3>
-            <p class="text-slate-300 text-sm mb-4 leading-relaxed">LINE内ブラウザではマイクやAI機能が正常に動作しません。<br><br>右上のメニュー（︙）から「他のブラウザで開く」を選択し、<strong class="text-emerald-400">Chrome</strong> または <strong class="text-blue-400">Edge</strong> をご利用ください。</p>
-        </div>
+      <div class="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+        <h3 class="text-xl font-bold text-red-400 mb-3 flex items-center gap-2"><i data-lucide="alert-triangle"></i> ブラウザ推奨</h3>
+        <p class="text-slate-300 text-sm mb-4 leading-relaxed">LINE内ブラウザではマイクやAI機能が正常に動作しません。<br><br>右上のメニュー（︙）から「他のブラウザで開く」を選択し、<strong class="text-emerald-400">Chrome</strong> または <strong class="text-blue-400">Edge</strong> をご利用ください。</p>
+      </div>
     </div>
 
     <!-- PWA Install Prompt Modal (PC) -->
     <div id="pwaInstallModal" class="fixed inset-0 bg-slate-950/80 z-[200] hidden flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 class="text-xl font-bold text-blue-400 mb-3 flex items-center gap-2"><i data-lucide="download"></i> アプリとしてインストール</h3>
-            <p class="text-slate-300 text-sm mb-4 leading-relaxed">PCブラウザのタブとしてではなく、独立したアプリとしてインストールすることをお勧めします。より快適に動作します。</p>
-            <div class="flex justify-end gap-3">
-                <button id="pwaInstallCancelBtn" class="px-4 py-2 text-sm text-slate-400 hover:text-white transition">後で</button>
-                <button id="pwaInstallBtn" class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold transition">インストール</button>
-            </div>
+      <div class="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+        <h3 class="text-xl font-bold text-blue-400 mb-3 flex items-center gap-2"><i data-lucide="download"></i> アプリとしてインストール</h3>
+        <p class="text-slate-300 text-sm mb-4 leading-relaxed">PCブラウザのタブとしてではなく、独立したアプリとしてインストールすることをお勧めします。より快適に動作します。</p>
+        <div class="flex justify-end gap-3">
+          <button id="pwaInstallCancelBtn" class="px-4 py-2 text-sm text-slate-400 hover:text-white transition">後で</button>
+          <button id="pwaInstallBtn" class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold transition">インストール</button>
         </div>
+      </div>
     </div>
 
     <!-- PWA Update Modal -->
     <div id="pwaUpdateModal" class="fixed bottom-4 right-4 bg-slate-800 border border-emerald-600/50 rounded-xl p-5 shadow-2xl z-[200] hidden max-w-sm animate-in slide-in-from-bottom-5">
-        <h3 class="text-lg font-bold text-emerald-400 mb-2 flex items-center gap-2"><i data-lucide="refresh-cw"></i> アップデートがあります</h3>
-        <p class="text-slate-300 text-sm mb-4">新しいバージョンが利用可能です。更新して最新機能を利用してください。</p>
-        <div class="flex justify-end gap-3">
-            <button id="pwaUpdateBtn" class="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-bold transition">今すぐ更新</button>
-        </div>
+      <h3 class="text-lg font-bold text-emerald-400 mb-2 flex items-center gap-2"><i data-lucide="refresh-cw"></i> アップデートがあります</h3>
+      <p class="text-slate-300 text-sm mb-4">新しいバージョンが利用可能です。更新して最新機能を利用してください。</p>
+      <div class="flex justify-end gap-3">
+        <button id="pwaUpdateBtn" class="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-bold transition">今すぐ更新</button>
+      </div>
     </div>
 
     <!-- Main Logic as ES Module -->
     <script type="module" src="/src/app.js"></script>
-</body>
+  </body>
 </html>
