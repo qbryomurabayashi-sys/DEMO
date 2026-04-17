@@ -339,10 +339,6 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Tab Switching
-    document.getElementById('tabTranscription').addEventListener('click', () => switchTab('transcription'));
-    document.getElementById('tabRealtimeAI').addEventListener('click', () => switchTab('realtime'));
-
     // Load Settings
     // (Already handled in DOMContentLoaded for splash)
 
@@ -497,29 +493,6 @@ async function saveSession() {
     }
     
     tx.oncomplete = () => loadHistory();
-}
-
-function switchTab(tab) {
-    const tabTrans = document.getElementById('tabTranscription');
-    const tabReal = document.getElementById('tabRealtimeAI');
-    const viewTrans = document.getElementById('viewTranscription');
-    const viewReal = document.getElementById('viewRealtimeAI');
-
-    if (tab === 'transcription') {
-        tabTrans.classList.add('border-blue-500', 'text-blue-400', 'bg-slate-900/50');
-        tabTrans.classList.remove('border-transparent', 'text-slate-500');
-        tabReal.classList.add('border-transparent', 'text-slate-500');
-        tabReal.classList.remove('border-blue-500', 'text-blue-400', 'bg-slate-900/50');
-        viewTrans.classList.remove('hidden');
-        viewReal.classList.add('hidden');
-    } else {
-        tabReal.classList.add('border-emerald-500', 'text-emerald-400', 'bg-slate-900/50');
-        tabReal.classList.remove('border-transparent', 'text-slate-500');
-        tabTrans.classList.add('border-transparent', 'text-slate-500');
-        tabTrans.classList.remove('border-blue-500', 'text-blue-400', 'bg-slate-900/50');
-        viewReal.classList.remove('hidden');
-        viewTrans.classList.add('hidden');
-    }
 }
 
 async function loadSession(id) {
