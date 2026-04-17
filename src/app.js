@@ -19,6 +19,14 @@ const customModelList = [
         low_resource_required: true,
         required_features: ["shader-f16"],
         model: "https://huggingface.co/welcoma/gemma-4-E2B-it-q4f16_1-MLC"
+    },
+    {
+        model_id: "gemma-3-9b-it-q4f16_1-MLC",
+        model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/gemma-2-9b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm",
+        vram_required_MB: 5000,
+        low_resource_required: false,
+        required_features: ["shader-f16"],
+        model: "https://huggingface.co/mlc-ai/gemma-2-9b-it-q4f16_1-MLC"
     }
 ];
 
@@ -147,11 +155,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     // Device detection for default model (Move here to use in splash)
     let savedModel = localStorage.getItem('webllm_model');
-    // Handle migration from old models
-    if (savedModel && savedModel.includes('gemma-4')) {
-        savedModel = 'Llama-3.2-3B-Instruct-q4f16_1-MLC';
-        localStorage.setItem('webllm_model', savedModel);
-    }
+    // REMOVED migration from gemma-4 to llama (User requested to keep Gemma 4)
     
     const modelSelect = document.getElementById('modelNameInput');
     if (savedModel && Array.from(modelSelect.options).some(opt => opt.value === savedModel)) {
@@ -915,8 +919,9 @@ async function generateSummary() {
     try {
         // Initialize or Reload Engine if model changed
         if (!engine || engine.activeModel !== modelName) {
-            const isLargeModel = modelName.includes('3B') || modelName.includes('2b');
-            const sizeEstimate = isLargeModel ? "約2〜3GB" : "約1GB";
+            const isVeryLargeModel = modelName.includes('9b') || modelName.includes('gemma-3');
+            const isMediumModel = modelName.includes('3B') || modelName.includes('e4b') || modelName.includes('2b');
+            const sizeEstimate = isVeryLargeModel ? "約5〜6GB" : (isMediumModel ? "約2〜3GB" : "約1GB");
 
             loadingTitle.innerText = "モデルを読み込み中...";
             progressContainer.classList.remove('hidden');
@@ -1028,7 +1033,7 @@ async function generateSummary() {
         
         let errorMsg = error.message || String(error);
         let isCrash = errorMsg.includes("Device was lost") || errorMsg.includes("Instance") || errorMsg.includes("disposed") || errorMsg.includes("memory");
-        let isUnsupported = modelName.includes('Llama-3.2') && errorMsg.includes("not found");
+        let isUnsupported = (modelName.includes('Llama-3.2') || modelName.includes('gemma')) && errorMsg.includes("not found");
         
         const summaryDisplay = document.getElementById('summaryDisplay');
         summaryDisplay.innerHTML = `

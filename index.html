@@ -92,7 +92,7 @@
     <link rel="apple-touch-startup-image" href="/apple-splash-640-1136.jpg" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
     <link rel="apple-touch-startup-image" href="/apple-splash-1136-640.jpg" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
   </head>
-  <body class="bg-slate-900 text-slate-200 h-screen flex flex-col font-sans overflow-hidden">
+  <body class="bg-slate-900 text-slate-200 min-h-screen flex flex-col font-sans lg:h-screen lg:overflow-hidden">
 
     <!-- Splash Screen / Loading Overlay -->
     <div id="splashScreen" class="fixed inset-0 bg-slate-950 z-[100] flex flex-col items-center justify-center p-6 transition-opacity duration-700">
@@ -159,10 +159,10 @@
     </header>
 
     <!-- Main Content Container -->
-    <div class="flex-1 flex overflow-hidden relative">
+    <div class="flex-1 flex flex-col lg:flex-row lg:overflow-hidden relative">
 
       <!-- Sidebar: History -->
-      <aside id="sidebar" class="fixed inset-y-0 left-0 w-72 bg-slate-950 border-r border-slate-800 z-30 transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 flex flex-col">
+      <aside id="sidebar" class="fixed inset-y-0 left-0 w-72 bg-slate-950 border-r border-slate-800 z-30 transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 flex flex-col h-full">
         <div class="p-4 border-b border-slate-800 flex justify-between items-center">
           <span class="text-xs font-bold text-slate-500 tracking-widest uppercase">保存されたセッション</span>
           <div class="flex items-center gap-1">
@@ -191,10 +191,10 @@
       </aside>
 
       <!-- Main Content -->
-      <main class="flex-1 flex flex-col lg:flex-row overflow-hidden p-4 sm:p-6 gap-6">
+      <main class="flex-1 flex flex-col lg:flex-row p-4 sm:p-6 gap-6 min-h-0 overflow-y-auto lg:overflow-hidden">
 
         <!-- Left Panel: Audio Capture & Transcription -->
-        <section class="flex-1 flex flex-col bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden w-full lg:w-1/2">
+        <section class="flex-1 flex flex-col bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden w-full lg:w-1/2 min-h-[500px] lg:min-h-0">
 
           <!-- Control Bar -->
           <div class="p-5 border-b border-slate-700 bg-slate-800/50 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between shrink-0">
@@ -293,7 +293,7 @@
         </section>
 
         <!-- Right Panel: AI Analysis -->
-        <section id="rightPanel" class="flex-1 flex flex-col bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden w-full lg:w-1/2">
+        <section id="rightPanel" class="flex-1 flex flex-col bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden w-full lg:w-1/2 min-h-[500px] lg:min-h-0">
 
           <!-- Control Bar -->
           <div class="p-5 border-b border-slate-700 bg-slate-800/50 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between shrink-0">
@@ -328,7 +328,7 @@
           <div class="flex-1 flex flex-col overflow-hidden bg-slate-900 relative">
 
             <!-- Task Selection Overlay (New) -->
-            <div id="taskSelectionOverlay" class="absolute top-0 left-0 right-0 bg-slate-800/95 border-b border-slate-700 p-4 z-20 shadow-xl transform -translate-y-full transition-transform duration-300">
+            <div id="taskSelectionOverlay" class="absolute top-0 left-0 right-0 bg-slate-800/95 border-b border-slate-700 p-4 z-20 shadow-xl transform -translate-y-full transition-transform duration-300 max-h-[80%] overflow-y-auto custom-scrollbar">
               <div class="flex flex-col gap-4">
                 <div class="flex justify-between items-center">
                   <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">AI タスク (複数選択可)</span>
@@ -399,13 +399,20 @@
           </h2>
           <button id="closeSettingsBtn" class="text-slate-400 hover:text-white transition"><i data-lucide="x" class="w-5 h-5"></i></button>
         </div>
-        <div class="p-6 space-y-5">
+        <div class="p-6 space-y-5 max-h-[70vh] overflow-y-auto custom-scrollbar">
           <div>
             <label class="block text-sm font-bold text-slate-300 mb-1">AIモデル選択 (速度 vs 精度)</label>
             <select id="modelNameInput" class="w-full bg-slate-900 border border-slate-600 rounded-md px-4 py-2.5 text-sm text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition font-mono">
-              <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">🎙️ Llama 3.2 3B (標準・高精度) - デフォルト</option>
-              <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">⚡ Llama 3.2 1B (高速・軽量)</option>
-              <option value="gemma-2-2b-it-q4f16_1-MLC">🧠 Gemma 2 2B (バランス)</option>
+              <optgroup label="Gemma シリーズ">
+                <option value="gemma-4-e4b-it-q4f16_1-MLC">🔥 Gemma 4 4B (試験実装・最強クラス)</option>
+                <option value="gemma-4-E2B-it-q4f16_1-MLC">✨ Gemma 4 2B (最新・軽量)</option>
+                <option value="gemma-3-9b-it-q4f16_1-MLC">🧠 Gemma 3 9B (高精度モデル・強制読込)</option>
+                <option value="gemma-2-2b-it-q4f16_1-MLC">🍃 Gemma 2 2B (標準)</option>
+              </optgroup>
+              <optgroup label="Llama シリーズ">
+                <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC" selected>🎙️ Llama 3.2 3B (標準・高精度)</option>
+                <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">⚡ Llama 3.2 1B (高速・軽量)</option>
+              </optgroup>
             </select>
             <p class="text-xs text-slate-500 mt-1.5">※初回実行時にブラウザのキャッシュにモデルがダウンロードされます。</p>
           </div>
