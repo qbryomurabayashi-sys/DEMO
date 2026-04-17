@@ -8,6 +8,29 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+/* Mobile Adjustments */
+@media (max-width: 1023px) {
+  body.is-mobile {
+    overflow: hidden;
+    height: 100vh;
+    height: -webkit-fill-available;
+  }
+  
+  #leftSection, #rightSection {
+    height: 100%;
+    overflow-y: auto;
+  }
+  
+  header {
+    flex-shrink: 0;
+  }
+  
+  main {
+    flex-shrink: 1;
+    min-height: 0;
+  }
+}
+
 .memo-highlight {
     @apply font-bold text-amber-500 bg-amber-500/10 px-1 rounded;
 }

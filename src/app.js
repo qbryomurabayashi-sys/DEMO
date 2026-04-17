@@ -259,7 +259,15 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Buttons
     document.getElementById('recBtn').addEventListener('click', toggleRecording);
     document.getElementById('refreshMicBtn').addEventListener('click', updateMicList);
-    document.getElementById('downloadAudioBtn').addEventListener('click', () => handleSave(currentAudioBlob, '.mp3', 'MP3音声データ'));
+    document.getElementById('downloadAudioBtn').addEventListener('click', () => {
+        let ext = '.webm';
+        if (currentAudioBlob) {
+            if (currentAudioBlob.type.includes('mp4')) ext = '.mp4';
+            else if (currentAudioBlob.type.includes('ogg')) ext = '.ogg';
+            else if (currentAudioBlob.type.includes('mp3')) ext = '.mp3';
+        }
+        handleSave(currentAudioBlob, ext, '音声データ');
+    });
     document.getElementById('downloadTransBtn').addEventListener('click', () => {
         const blob = new Blob([finalTranscript], { type: 'text/plain' });
         handleSave(blob, '.txt', '文字起こしデータ');
@@ -679,28 +687,31 @@ function updateStorageUsage(bytes) {
 // --- Splash & Pre-init Logic ---
 async function startSplashAndInit() {
     const splashScreen = document.getElementById('splashScreen');
+    const splashStatusText = document.getElementById('splashStatusText');
+    const splashSubtext = document.getElementById('splashSubtext');
+    const splashLoadingArea = document.getElementById('splashLoadingArea');
+    const splashProgressBar = document.getElementById('splashProgressBar');
+    const splashPercentText = document.getElementById('splashPercentText');
+    const splashTimeRemaining = document.getElementById('splashTimeRemaining');
+    const splashChangeModelBtn = document.getElementById('splashChangeModelBtn');
     
     // --- Mobile Checking ---
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if (isMobile) {
-        document.getElementById('rightPanel')?.classList.add('hidden');
-        document.getElementById('tabRealtimeAI')?.classList.add('hidden');
-        document.getElementById('realtimeAiToggle')?.closest('label')?.classList.add('hidden');
-        document.getElementById('settingsBtn')?.classList.add('hidden');
-        document.getElementById('currentModelDisplay')?.classList.add('hidden');
-        
-        splashScreen.classList.add('opacity-0');
-        setTimeout(() => splashScreen.remove(), 700);
-        return; // Early return, do not load WebLLM on mobile
+        document.body.classList.add('is-mobile');
     }
 
-    const splashLoadingArea = document.getElementById('splashLoadingArea');
-    const splashProgressBar = document.getElementById('splashProgressBar');
-    const splashStatusText = document.getElementById('splashStatusText');
-    const splashPercentText = document.getElementById('splashPercentText');
-    const splashSubtext = document.getElementById('splashSubtext');
-    const splashTimeRemaining = document.getElementById('splashTimeRemaining');
-    const splashChangeModelBtn = document.getElementById('splashChangeModelBtn');
+    if (!navigator.gpu) {
+        console.warn("WebGPU not supported. AI features restricted.");
+        if (splashSubtext) splashSubtext.innerText = "WebGPU非対応デバイスです。AI分析機能は制限されますが、録音と文字起こしは利用可能です。";
+        setTimeout(() => {
+            if (splashScreen) {
+                splashScreen.classList.add('opacity-0');
+                setTimeout(() => splashScreen.remove(), 700);
+            }
+        }, 3000);
+        return; 
+    }
 
     // 3 second minimum timer
     const minTimer = new Promise(resolve => setTimeout(resolve, 3000));
@@ -819,10 +830,8 @@ async function startSplashAndInit() {
 
 // --- App Initialization ---
 function initApp() {
-    if (!navigator.gpu) {
-        showError("CRITICAL ERR: WebGPUがサポートされていないか、無効になっています。Chrome / Edge の最新版を使用し、GPUアクセラレーションを有効にしてください。");
-    }
-    updateMicList();
+    setupMobileTabs();
+    
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
@@ -846,12 +855,13 @@ function initApp() {
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 const res = event.results[i];
                 if (res.isFinal) {
-                    const text = res[0].transcript;
+                    const text = res[0].transcript.trim();
+                    if (!text) continue; // Skip empty output which creates orphaned timestamps
                     finalTranscript += `[${currentTime}] ${text}\n`;
                     localStorage.setItem('local_ai_assistant_text', finalTranscript);
                     
                     // Add to buffer for real-time AI processing if enabled
-                    const isRealtimeEnabled = document.getElementById('realtimeAiToggle').checked;
+                    const isRealtimeEnabled = document.getElementById('realtimeAiToggle')?.checked;
                     if (isRealtimeEnabled) {
                         realtimeAiBuffer += text + ' ';
                         processRealtimeAI();
@@ -903,8 +913,47 @@ async function requestWakeLock() {
 }
 function releaseWakeLock() { if (wakeLock) { wakeLock.release().then(()=>wakeLock=null).catch(()=>{}); } }
 function showError(msg) { 
-    document.getElementById('sysErrorArea').classList.remove('hidden'); 
+    const area = document.getElementById('sysErrorArea');
+    if (!area) return;
+    area.classList.remove('hidden'); 
     document.getElementById('sysErrorText').innerText = msg; 
+}
+
+function setupMobileTabs() {
+    const tabTranscription = document.getElementById('mobileTabTranscription');
+    const tabAi = document.getElementById('mobileTabAi');
+    const viewTranscription = document.getElementById('leftSection');
+    const viewAi = document.getElementById('rightSection');
+
+    if (!tabTranscription || !tabAi || !viewTranscription || !viewAi) return;
+
+    tabTranscription.addEventListener('click', () => {
+        tabTranscription.classList.add('text-blue-400', 'border-blue-400');
+        tabTranscription.classList.remove('text-slate-500', 'border-transparent');
+        tabAi.classList.remove('text-emerald-400', 'border-emerald-400');
+        tabAi.classList.add('text-slate-500', 'border-transparent');
+        
+        viewTranscription.classList.remove('hidden');
+        viewAi.classList.add('hidden');
+        viewTranscription.classList.add('flex');
+    });
+
+    tabAi.addEventListener('click', () => {
+        tabAi.classList.add('text-emerald-400', 'border-emerald-400');
+        tabAi.classList.remove('text-slate-500', 'border-transparent');
+        tabTranscription.classList.remove('text-blue-400', 'border-blue-400');
+        tabTranscription.classList.add('text-slate-500', 'border-transparent');
+        
+        viewAi.classList.remove('hidden');
+        viewTranscription.classList.add('hidden');
+        viewTranscription.classList.remove('flex');
+        viewAi.classList.add('flex');
+    });
+    
+    // Initial check for mobile to trigger flex/hidden
+    if (window.innerWidth < 1024) {
+        tabTranscription.click();
+    }
 }
 
 // --- Recording Logic ---
@@ -943,7 +992,8 @@ async function toggleRecording() {
 
         setTimeout(() => {
             if(audioChunks.length > 0) {
-                currentAudioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                const mimeType = mediaRecorder ? mediaRecorder.mimeType : 'audio/webm';
+                currentAudioBlob = new Blob(audioChunks, { type: mimeType });
                 document.getElementById('downloadAudioBtn').disabled = false;
             }
         }, 200);
@@ -970,7 +1020,8 @@ async function toggleRecording() {
                 if (e.data.size > 0) {
                     audioChunks.push(e.data); 
                     if (db) {
-                        const backupBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                        const mimeType = mediaRecorder ? mediaRecorder.mimeType : 'audio/webm';
+                        const backupBlob = new Blob(audioChunks, { type: mimeType });
                         const tx = db.transaction('backups', 'readwrite');
                         tx.objectStore('backups').put({ id: 'latest_audio', blob: backupBlob });
                     }
