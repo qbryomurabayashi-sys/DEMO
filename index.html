@@ -135,25 +135,59 @@
     </div>
 
     <!-- Header -->
-    <header class="bg-slate-950 border-b border-slate-800 px-6 py-4 flex justify-between items-center shrink-0 shadow-md z-20">
-      <div class="flex items-center gap-3">
+    <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 shrink-0 z-20 shadow-xl">
+      <div class="flex items-center gap-4 w-full md:w-auto">
         <button id="toggleSidebarBtn" class="p-2 text-slate-400 hover:text-white bg-slate-800 rounded-md lg:hidden">
           <i data-lucide="menu" class="w-5 h-5"></i>
         </button>
-        <div class="bg-blue-600 p-2 rounded-lg hidden sm:block">
-          <i data-lucide="mic-2" class="w-5 h-5 text-white"></i>
+        <div class="flex items-center gap-3">
+          <div class="bg-blue-600 p-2 rounded-lg">
+            <i data-lucide="mic-2" class="w-5 h-5 text-white"></i>
+          </div>
+          <h1 class="text-xl font-black text-slate-100 tracking-tighter uppercase italic">ローカルAI議事録</h1>
         </div>
-        <h1 class="text-lg font-bold text-slate-100 tracking-wide">ローカルAI議事録</h1>
-        <span class="bg-slate-800 text-emerald-400 text-[10px] px-2 py-1 rounded border border-slate-700 font-mono ml-2 hidden sm:flex items-center gap-1">
-                <i data-lucide="zap" class="w-3 h-3"></i> WebGPU Powered
+        <div class="hidden xl:flex items-center gap-2">
+            <span class="bg-slate-800 text-emerald-400 text-[10px] px-2 py-1 rounded border border-slate-700 font-mono flex items-center gap-1">
+                <i data-lucide="zap" class="w-3 h-3"></i> WebGPU
             </span>
-        <span id="currentModelDisplay" class="bg-blue-900/50 text-blue-300 text-[10px] px-3 py-1 rounded-full border border-blue-700/50 font-bold ml-2 hidden sm:flex items-center gap-1 shadow-[0_0_8px_rgba(59,130,246,0.2)]">
+            <span id="currentModelDisplay" class="bg-blue-900/50 text-blue-300 text-[10px] px-3 py-1 rounded-full border border-blue-700/50 font-bold flex items-center gap-1">
                 <i data-lucide="cpu" class="w-3 h-3"></i> <span id="currentModelName">読み込み中...</span>
-        </span>
+            </span>
+        </div>
       </div>
-      <div class="flex items-center gap-4">
-        <button id="settingsBtn" class="flex items-center gap-2 text-slate-400 hover:text-white transition bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-md border border-slate-700 text-sm">
-          <i data-lucide="settings" class="w-4 h-4"></i> WebLLM 設定
+
+      <!-- Centered Global Controls: ALWAYS VISIBLE AND ACCESSIBLE -->
+      <div class="flex items-center bg-slate-950/80 rounded-2xl p-1.5 border border-slate-800 shadow-inner w-full md:w-auto max-w-2xl">
+          <button id="recBtn" class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-black text-sm transition-all active:scale-95 shadow-lg shadow-blue-900/40 whitespace-nowrap">
+            <i data-lucide="mic" class="w-4 h-4"></i> <span id="recBtnText">録音開始</span>
+          </button>
+          
+          <div class="flex items-center gap-4 px-4 border-r border-slate-800 mx-1">
+            <div id="recIndicator" class="w-2.5 h-2.5 rounded-full bg-slate-600 transition-all duration-300"></div>
+            <span id="timerDisplay" class="font-mono text-xl font-light text-slate-200 tracking-wider w-24">00:00:00</span>
+          </div>
+
+          <div class="flex-1 flex items-center gap-2 px-2 min-w-[140px]">
+            <select id="micSelect" class="bg-transparent text-slate-300 text-xs py-1 px-2 focus:outline-none w-full truncate"></select>
+            <button id="refreshMicBtn" class="p-1.5 text-slate-500 hover:text-white transition" title="マイク更新">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
+          <div class="px-3 border-l border-slate-800">
+              <label class="flex items-center gap-2 cursor-pointer group" title="リアルタイム要約">
+                <input type="checkbox" id="realtimeAiToggle" class="sr-only peer" checked>
+                <div class="relative w-8 h-4 bg-slate-700 rounded-full transition-colors peer-checked:bg-emerald-500">
+                    <div class="absolute left-0.5 top-0.5 bg-white w-3 h-3 rounded-full transition-transform transform peer-checked:translate-x-4"></div>
+                </div>
+                <i data-lucide="zap" class="w-3.5 h-3.5 text-slate-500 peer-checked:text-emerald-400"></i>
+              </label>
+          </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="settingsBtn" class="text-slate-400 hover:text-white transition bg-slate-800 hover:bg-slate-700 p-2.5 rounded-xl border border-slate-700 text-sm">
+          <i data-lucide="settings" class="w-5 h-5"></i>
         </button>
       </div>
     </header>
@@ -190,221 +224,79 @@
         </div>
       </aside>
 
-      <!-- Main Content -->
-      <main class="flex-1 flex flex-col lg:flex-row p-4 sm:p-6 gap-6 min-h-0 overflow-y-auto lg:overflow-hidden">
-
-        <!-- Left Panel: Audio Capture & Transcription -->
-        <section class="flex-1 flex flex-col bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden w-full lg:w-1/2 min-h-[500px] lg:min-h-0">
-
-          <!-- Control Bar: Primary Actions & Mic Settings -->
-          <div class="p-4 sm:p-5 border-b border-slate-700 bg-slate-800/80 flex flex-col gap-5 shrink-0">
-            
-            <!-- Top Row: Mic Selection & Toggles -->
-            <div class="flex flex-wrap items-center justify-between gap-4">
-              <div class="flex items-center gap-2 flex-1 min-w-[200px]">
-                <div class="bg-slate-900 border border-slate-700 p-2 rounded-md text-slate-500">
-                  <i data-lucide="mic-2" class="w-4 h-4"></i>
-                </div>
-                <select id="micSelect" class="flex-1 bg-slate-900 border border-slate-600 rounded-md px-3 py-2 text-sm text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"></select>
-                <button id="refreshMicBtn" class="p-2 text-slate-400 hover:text-white bg-slate-900 border border-slate-600 rounded-md transition active:scale-95" title="マイク更新">
-                  <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-                </button>
-              </div>
-
-              <!-- Realtime AI Toggle -->
-              <label class="flex items-center gap-3 cursor-pointer group bg-slate-900/50 px-3 py-2 rounded-lg border border-slate-700/50 hover:bg-slate-900 transition" title="録音中のリアルタイムAI解析">
-                <div class="relative">
-                  <input type="checkbox" id="realtimeAiToggle" class="sr-only peer" checked="">
-                  <div class="block bg-slate-700 w-9 h-5 rounded-full transition-colors duration-300 peer-checked:bg-emerald-500"></div>
-                  <div class="dot absolute left-1 top-1 bg-white w-3 h-3 rounded-full transition-transform duration-300 transform peer-checked:translate-x-4"></div>
-                </div>
-                <span class="text-[11px] font-bold text-slate-400 group-hover:text-slate-200 transition flex items-center gap-1.5 whitespace-nowrap">
-                  <i data-lucide="zap" class="w-3 h-3 text-emerald-400"></i> AI リアルタイム要約
+      <!-- Main Content Split Layout -->
+      <main class="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden bg-slate-950">
+        
+        <!-- Left Section: Transcription -->
+        <section class="flex-1 flex flex-col border-r border-slate-800 bg-slate-900/40 relative">
+            <div class="px-5 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/80 backdrop-blur-md">
+                <span class="text-xs font-bold text-slate-400 tracking-wider flex items-center gap-2 uppercase">
+                    <i data-lucide="align-left" class="w-4 h-4"></i> 文字起こし
                 </span>
-              </label>
-            </div>
-
-            <!-- Bottom Row: Recording Controls (High Priority) -->
-            <div class="flex items-center gap-4 pt-1">
-              <div class="flex-1 bg-black/40 border border-slate-700/50 rounded-xl px-5 py-3 flex items-center justify-between shadow-inner">
-                <div class="flex items-center gap-3">
-                  <div id="recIndicator" class="w-3 h-3 rounded-full bg-slate-600 shadow-[0_0_8px_rgba(71,85,105,0.4)] transition-all duration-300"></div>
-                  <span class="text-[10px] font-black text-slate-500 tracking-[0.2em] uppercase">Status</span>
+                <div class="flex gap-1">
+                    <button id="downloadTransBtn" class="text-slate-400 hover:text-white p-2 rounded hover:bg-slate-800 transition disabled:opacity-30" title="テキストを保存" disabled>
+                        <i data-lucide="save" class="w-4 h-4"></i>
+                    </button>
+                    <button id="downloadAudioBtn" class="text-slate-400 hover:text-white p-2 rounded hover:bg-slate-800 transition disabled:opacity-30" title="音声保存" disabled>
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                    </button>
+                    <button id="clearDataBtn" class="text-slate-400 hover:text-red-400 p-2 rounded hover:bg-red-900/20 transition" title="消去">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
                 </div>
-                <span id="timerDisplay" class="font-mono text-2xl font-light text-slate-200 tracking-wider">00:00:00</span>
-              </div>
-
-              <button id="recBtn" class="flex-shrink-0 flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-700 text-white px-10 py-4 rounded-xl font-black text-lg transition-all active:scale-95 shadow-lg shadow-blue-900/40 min-w-[180px] whitespace-nowrap">
-                <i data-lucide="mic" class="w-6 h-6"></i> <span id="recBtnText">録音開始</span>
-              </button>
             </div>
-          </div>
 
-          <!-- Error Area -->
-          <div id="sysErrorArea" class="hidden bg-red-900/50 border-b border-red-800 text-red-200 text-sm p-4 flex gap-3 shrink-0">
-            <i data-lucide="alert-triangle" class="w-5 h-5 shrink-0"></i><span id="sysErrorText" class="leading-relaxed"></span>
-          </div>
-
-          <!-- Transcription Log -->
-          <div class="bg-slate-900/50 px-5 py-3 border-b border-slate-700 flex justify-between items-center shrink-0">
-            <span class="text-sm font-bold text-slate-400 tracking-wider flex items-center gap-2">
-                    <i data-lucide="align-left" class="w-5 h-5"></i> 文字起こし (自動保存)
-                </span>
-            <div class="flex gap-3">
-              <button id="downloadTransBtn" class="text-slate-400 hover:text-white transition disabled:opacity-30 flex items-center gap-1 text-sm" title="テキストを保存" disabled="">
-                <i data-lucide="save" class="w-5 h-5"></i> <span class="hidden sm:inline">テキスト保存</span>
-              </button>
-              <button id="downloadAudioBtn" class="text-slate-400 hover:text-white transition disabled:opacity-30 flex items-center gap-1 text-sm" title="音声(MP3)ダウンロード" disabled="">
-                <i data-lucide="download" class="w-5 h-5"></i> <span class="hidden sm:inline">音声保存</span>
-              </button>
-              <button id="clearDataBtn" class="text-slate-400 hover:text-red-400 transition ml-2 flex items-center gap-1 text-sm" title="データ消去">
-                <i data-lucide="trash-2" class="w-5 h-5"></i> <span class="hidden sm:inline">消去</span>
-              </button>
-            </div>
-          </div>
-          <div id="terminalContainer" class="flex-1 flex flex-col overflow-hidden bg-slate-900">
-
-            <!-- Upper Panel: Transcription View -->
-            <div class="flex-1 flex flex-col min-h-0 overflow-hidden relative border-b border-slate-800">
-              <div class="px-4 py-2 bg-slate-950/50 border-b border-slate-800 flex items-center justify-between shrink-0">
-                <span class="text-[10px] font-bold text-blue-400 tracking-widest uppercase flex items-center gap-1.5">
-                  <i data-lucide="align-left" class="w-3 h-3"></i> 文字起こし (全体ログ)
-                </span>
-                <span class="text-[9px] text-slate-600 font-mono italic">RAW TRANSCRIPT</span>
-              </div>
-              <div id="viewTranscription" class="flex-1 p-6 overflow-y-auto custom-scrollbar text-slate-200 leading-relaxed text-base">
-                <div id="transcriptionPlaceholder" class="text-slate-500 flex flex-col items-center justify-center h-full opacity-60">
-                  <i data-lucide="mic-off" class="w-12 h-12 mb-3"></i>
-                  <p class="text-base font-bold mb-1">録音待機中...</p>
-                  <p class="text-xs">上の「録音開始」ボタンを押して話してください。</p>
+            <div id="viewTranscription" class="flex-1 overflow-y-auto custom-scrollbar p-6 pb-24 text-slate-200 leading-relaxed">
+                <!-- Error Area Immersive -->
+                <div id="sysErrorArea" class="hidden mb-4 bg-red-900/40 border border-red-800/50 text-red-100 text-[10px] p-3 rounded-lg flex gap-2 items-center">
+                    <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0"></i><span id="sysErrorText"></span>
                 </div>
-                <div id="transcriptionDisplay" class="whitespace-pre-wrap break-words"></div>
-                <div id="interimDisplay" class="text-slate-500 italic mt-2"></div>
-              </div>
+
+                <div id="transcriptionPlaceholder" class="text-slate-600 flex flex-col items-center justify-center h-full opacity-40">
+                  <i data-lucide="activity" class="w-12 h-12 mb-4"></i>
+                  <p class="text-sm font-bold uppercase tracking-widest mb-1">録音準備完了</p>
+                  <p class="text-[10px]">上のボタンから録音を開始してください</p>
+                </div>
+                <div id="transcriptionDisplay" class="whitespace-pre-wrap break-words text-lg"></div>
+                <div id="interimDisplay" class="text-slate-500 italic mt-2 text-lg"></div>
             </div>
 
-            <!-- Lower Panel: Real-time AI View -->
-            <div class="flex-1 flex flex-col min-h-0 overflow-hidden bg-emerald-950/5 shadow-[inset_0_4px_12px_rgba(0,0,0,0.1)]">
-              <div class="px-4 py-2 bg-slate-950/50 border-b border-slate-800 flex items-center justify-between shrink-0">
-                <span class="text-[10px] font-bold text-emerald-400 tracking-widest uppercase flex items-center gap-1.5">
-                  <i data-lucide="zap" class="w-3 h-3 text-emerald-500"></i> リアルタイムAI (全体要約)
-                </span>
-                <span class="text-[9px] text-emerald-950/60 font-mono italic bg-emerald-500/20 px-2 rounded-full border border-emerald-500/20">LIVE ENGINE</span>
-              </div>
-              <div id="viewRealtimeAI" class="flex-1 p-6 overflow-y-auto custom-scrollbar text-emerald-100 leading-relaxed text-base">
-                <div id="realtimePlaceholder" class="text-emerald-800/50 flex flex-col items-center justify-center h-full">
-                  <i data-lucide="sparkles" class="w-12 h-12 mb-3 opacity-20"></i>
-                  <p class="text-base font-bold mb-1">AI 解析準備中...</p>
-                  <p class="text-xs">発話内容に基づいてリアルタイムに全体要約を更新します。</p>
+            <!-- Manual Memo Input Floating -->
+            <div class="absolute bottom-6 left-6 right-6 z-10 transition-transform focus-within:scale-[1.02]">
+                <div class="bg-slate-900/90 backdrop-blur-xl border border-slate-700 p-2 pl-4 rounded-2xl flex items-center gap-2 shadow-2xl shadow-black/50">
+                    <i data-lucide="sticky-note" class="w-4 h-4 text-slate-500"></i>
+                    <textarea id="manualMemoInput" placeholder="重要なメモを追加..." class="flex-1 bg-transparent border-none py-2 text-sm text-slate-200 focus:outline-none resize-none h-10 custom-scrollbar"></textarea>
+                    <button id="addMemoBtn" class="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-xl transition shadow-lg shadow-blue-900/40">
+                        <i data-lucide="plus" class="w-5 h-5"></i>
+                    </button>
                 </div>
-                <div id="realtimeAiDisplay" class="whitespace-pre-wrap break-words hidden"></div>
-              </div>
             </div>
-            
-            <!-- Manual Memo Input -->
-            <div class="p-3 border-t border-slate-700 bg-slate-800/80 shrink-0 relative flex gap-2 items-end">
-              <textarea id="manualMemoInput" placeholder="重要メモを入力... (箇条書きでAIに反映)" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg py-2.5 px-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none h-12 custom-scrollbar"></textarea>
-              <button id="addMemoBtn" class="bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg transition shadow-lg shadow-blue-500/10" title="メモを追加">
-                <i data-lucide="send" class="w-4 h-4"></i>
-              </button>
-            </div>
-          </div>
         </section>
 
-        <!-- Right Panel: AI Analysis -->
-        <section id="rightPanel" class="flex-1 flex flex-col bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden w-full lg:w-1/2 min-h-[500px] lg:min-h-0">
-
-          <!-- Control Bar -->
-          <div class="p-5 border-b border-slate-700 bg-slate-800/50 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between shrink-0">
-            <div class="flex items-center gap-3 w-full sm:w-auto">
-              <div class="bg-emerald-900/50 p-3 rounded-md border border-emerald-800/50">
-                <i data-lucide="bot" class="w-5 h-5 text-emerald-400"></i>
-              </div>
-              <button id="showTasksBtn" class="flex-1 sm:w-64 bg-slate-900 border border-slate-600 rounded-md px-4 py-3 text-base text-slate-200 flex justify-between items-center hover:border-emerald-500 transition">
-                <span class="font-bold">AI タスクを選択...</span>
-                <i data-lucide="chevron-down" class="w-5 h-5 text-slate-500"></i>
-              </button>
-            </div>
-            <button id="generateBtn" class="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-md font-bold text-lg transition shadow-sm disabled:opacity-50 w-full sm:w-auto">
-              <i data-lucide="sparkles" class="w-5 h-5"></i> AI 実行
-            </button>
-          </div>
-
-          <!-- AI Output Area -->
-          <div class="bg-slate-900/50 px-5 py-3 border-b border-slate-700 flex justify-between items-center shrink-0">
-            <span class="text-sm font-bold text-slate-400 tracking-wider flex items-center gap-2">
-                    <i data-lucide="file-text" class="w-5 h-5"></i> AI 出力結果
+        <!-- Right Section: Real-time AI -->
+        <section class="flex-1 flex flex-col bg-slate-950 relative overflow-hidden">
+             <div class="px-5 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/40 backdrop-blur-md">
+                <span class="text-xs font-bold text-emerald-500/80 tracking-widest flex items-center gap-2 uppercase">
+                    <i data-lucide="zap" class="w-4 h-4"></i> リアルタイム要約
                 </span>
-            <div class="flex gap-3">
-              <button id="downloadTextBtn" class="text-slate-400 hover:text-white transition disabled:opacity-30 hidden flex items-center gap-1 text-sm" title="テキストを保存">
-                <i data-lucide="save" class="w-5 h-5"></i> <span class="hidden sm:inline">保存</span>
-              </button>
-              <button id="copyAiBtn" class="text-slate-400 hover:text-white transition disabled:opacity-30 hidden flex items-center gap-1 text-sm" title="結果をコピー">
-                <i data-lucide="copy" class="w-5 h-5"></i> <span class="hidden sm:inline">コピー</span>
-              </button>
+                <button id="openAiPanelBtn" class="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/30 text-[10px] font-bold uppercase tracking-tighter transition flex items-center gap-1.5 shadow-lg shadow-emerald-950/40">
+                    <i data-lucide="bot" class="w-3 h-3"></i> セッションを分析
+                </button>
             </div>
-          </div>
-          <div class="flex-1 flex flex-col overflow-hidden bg-slate-900 relative">
 
-            <!-- Task Selection Overlay (New) -->
-            <div id="taskSelectionOverlay" class="absolute top-0 left-0 right-0 bg-slate-800/95 border-b border-slate-700 p-4 z-20 shadow-xl transform -translate-y-full transition-transform duration-300 max-h-[80%] overflow-y-auto custom-scrollbar">
-              <div class="flex flex-col gap-4">
-                <div class="flex justify-between items-center">
-                  <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">AI タスク (複数選択可)</span>
-                  <button id="hideTasksBtn" class="text-slate-400 hover:text-white"><i data-lucide="chevron-up" class="w-4 h-4"></i></button>
+            <div id="viewRealtimeAI" class="flex-1 overflow-y-auto custom-scrollbar p-8 text-emerald-50 leading-relaxed">
+                <div id="realtimePlaceholder" class="text-emerald-900/40 flex flex-col items-center justify-center h-full">
+                  <i data-lucide="sparkles" class="w-16 h-16 mb-4 opacity-10 animate-pulse"></i>
+                  <p class="text-sm font-bold uppercase tracking-widest mb-1">AIがリアルタイムで分析中...</p>
+                   <p class="text-[10px]">話すと内容が表示されます</p>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <label class="flex items-center gap-3 p-3 bg-slate-900 rounded-lg border border-slate-700 cursor-pointer hover:border-emerald-500 transition group">
-                    <input type="checkbox" name="aiTask" value="correction" class="w-4 h-4 rounded border-slate-600 text-emerald-600 focus:ring-emerald-500 bg-slate-800">
-                    <div class="flex flex-col">
-                      <span class="text-sm font-bold text-slate-200 group-hover:text-emerald-400 transition">文字起こしの補正</span>
-                      <span class="text-[10px] text-slate-500">文脈から誤字脱字をAIで修正します</span>
-                    </div>
-                  </label>
-                  <label class="flex items-center gap-3 p-3 bg-slate-900 rounded-lg border border-slate-700 cursor-pointer hover:border-emerald-500 transition group">
-                    <input type="checkbox" name="aiTask" value="context_doc" class="w-4 h-4 rounded border-slate-600 text-emerald-600 focus:ring-emerald-500 bg-slate-800">
-                    <div class="flex flex-col">
-                      <span class="text-sm font-bold text-slate-200 group-hover:text-emerald-400 transition">文脈考慮・公式文書作成</span>
-                      <span class="text-[10px] text-slate-500">前後の文脈を読み取り、正式な記録として整理します</span>
-                    </div>
-                  </label>
-                  <label class="flex items-center gap-3 p-3 bg-slate-900 rounded-lg border border-slate-700 cursor-pointer hover:border-emerald-500 transition group">
-                    <input type="checkbox" name="aiTask" value="minutes" class="w-4 h-4 rounded border-slate-600 text-emerald-600 focus:ring-emerald-500 bg-slate-800" checked="">
-                    <div class="flex flex-col">
-                      <span class="text-sm font-bold text-slate-200 group-hover:text-emerald-400 transition">議事録作成</span>
-                      <span class="text-[10px] text-slate-500">決定事項やタスクを抽出</span>
-                    </div>
-                  </label>
-                </div>
-              </div>
+                <div id="realtimeAiDisplay" class="whitespace-pre-wrap break-words space-y-4"></div>
             </div>
-            <div class="flex-1 p-5 overflow-y-auto custom-scrollbar text-slate-200 leading-relaxed text-sm relative">
-              <div id="summaryPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 italic p-6 text-center">
-                <i data-lucide="cpu" class="w-12 h-12 mb-4 opacity-30"></i>
-                <p>録音完了後、右上の「AI 実行」をクリックしてください。</p>
-                <p class="text-xs mt-3 text-slate-600">※処理はすべてブラウザ内（WebGPU）で完結します。</p>
-              </div>
-              <div id="summaryDisplay" class="hidden space-y-8 pb-10">
 
-                <!-- AI Results will be injected here -->
-              </div>
-
-              <!-- Loading & Progress Indicator -->
-              <div id="loadingIndicator" class="hidden absolute inset-0 bg-slate-900/90 backdrop-blur-sm flex-col items-center justify-center text-emerald-400 z-10 p-6 text-center">
-                <i data-lucide="loader-2" class="w-10 h-10 animate-spin mb-4"></i>
-                <span id="loadingTitle" class="text-sm font-bold tracking-wider mb-2">ローカルAI処理中...</span>
-
-                <!-- Progress Bar Container -->
-                <div id="downloadProgressContainer" class="w-full max-w-xs hidden flex flex-col items-center mt-4">
-                  <div class="w-full bg-slate-700 rounded-full h-2.5 mb-2 overflow-hidden">
-                    <div id="downloadProgressBar" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                  </div>
-                  <span id="downloadProgressText" class="text-xs text-slate-400 font-mono">0%</span>
-                </div>
-                <span id="loadingSubtext" class="text-xs text-slate-500 mt-4">ブラウザのWebGPUを使用して推論を行っています...</span>
-              </div>
-            </div>
-          </div>
+            <!-- Global Action Hint -->
+             <div class="p-4 text-center border-t border-slate-800 bg-slate-900/50">
+                 <p class="text-[9px] text-slate-500 uppercase tracking-[0.2em] font-bold">深層学習実行中 • 4096トークン・コンテキスト</p>
+             </div>
         </section>
       </main>
     </div>
@@ -529,6 +421,131 @@
       <div class="flex justify-end gap-3">
         <button id="pwaUpdateBtn" class="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-bold transition">今すぐ更新</button>
       </div>
+    </div>
+
+    <!-- AI Analysis Modal (Separate Analysis Screen) -->
+    <div id="aiAnalysisModal" class="fixed inset-0 z-[500] bg-slate-950 flex flex-col hidden overflow-hidden">
+        <header class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/80 backdrop-blur-xl shrink-0">
+           <div class="flex items-center gap-4">
+               <button id="closeAiModalBtn" class="text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition">
+                   <i data-lucide="arrow-left" class="w-6 h-6"></i>
+               </button>
+               <div>
+                   <h2 class="text-lg font-bold text-slate-100 italic">詳細セッション分析</h2>
+                   <p class="text-[10px] text-slate-500 uppercase tracking-widest">タスクを選択し、AI動作をカスタマイズ</p>
+               </div>
+           </div>
+           <button id="generateBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-black text-sm transition-all shadow-xl shadow-emerald-900/40 flex items-center gap-2">
+               <i data-lucide="play" class="w-4 h-4 fill-current"></i> AI分析を実行
+           </button>
+        </header>
+
+        <div class="flex-1 overflow-hidden bg-slate-950 flex flex-col lg:flex-row">
+            <!-- Selection Sidebar -->
+            <aside class="w-full lg:w-80 border-r border-slate-800 p-6 flex flex-col gap-8 bg-slate-900/30 overflow-y-auto custom-scrollbar">
+                <div class="space-y-4">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                        <i data-lucide="list-checks" class="w-4 h-4"></i> 分析タスク
+                    </h3>
+                    <div id="aiTasksList" class="space-y-2">
+                       <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-700 bg-slate-950/50 cursor-pointer hover:border-emerald-500 transition group has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-900/10">
+                          <input type="checkbox" name="aiTask" value="correction" class="hidden" checked>
+                          <div class="w-4 h-4 rounded border-2 border-slate-600 flex items-center justify-center group-hover:border-emerald-500 transition">
+                              <i data-lucide="check" class="w-3 h-3 text-white hidden"></i>
+                          </div>
+                          <span class="text-xs font-bold text-slate-300 group-hover:text-emerald-400 transition uppercase tracking-tighter">文字起こしの補正</span>
+                       </label>
+                       <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-700 bg-slate-950/50 cursor-pointer hover:border-emerald-500 transition group has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-900/10">
+                          <input type="checkbox" name="aiTask" value="minutes" class="hidden" checked>
+                          <div class="w-4 h-4 rounded border-2 border-slate-600 flex items-center justify-center group-hover:border-emerald-500 transition">
+                              <i data-lucide="check" class="w-3 h-3 text-white hidden"></i>
+                          </div>
+                          <span class="text-xs font-bold text-slate-300 group-hover:text-emerald-400 transition uppercase tracking-tighter">要点・議事録作成</span>
+                       </label>
+                       <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-700 bg-slate-950/50 cursor-pointer hover:border-emerald-500 transition group has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-900/10">
+                          <input type="checkbox" name="aiTask" value="todo" class="hidden">
+                          <div class="w-4 h-4 rounded border-2 border-slate-600 flex items-center justify-center group-hover:border-emerald-500 transition">
+                              <i data-lucide="check" class="w-3 h-3 text-white hidden"></i>
+                          </div>
+                          <span class="text-xs font-bold text-slate-300 group-hover:text-emerald-400 transition uppercase tracking-tighter">TODO抽出</span>
+                       </label>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                            <i data-lucide="maximize" class="w-4 h-4"></i> 出力の長さ
+                        </h3>
+                        <div class="flex flex-col gap-1">
+                            <select id="aiLengthSelect" class="w-full bg-slate-950 border border-slate-700 p-3 rounded-xl text-slate-300 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none appearance-none cursor-pointer font-bold">
+                                <option value="short">短め（箇条書き）</option>
+                                <option value="medium" selected>標準</option>
+                                <option value="long">長め（詳細）</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                            <i data-lucide="message-square" class="w-4 h-4"></i> トーンとスタイル
+                        </h3>
+                        <div class="flex flex-col gap-1">
+                            <select id="aiToneSelect" class="w-full bg-slate-950 border border-slate-700 p-3 rounded-xl text-slate-300 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none appearance-none cursor-pointer font-bold">
+                                <option value="neutral" selected>標準</option>
+                                <option value="formal">フォーマル / ビジネス</option>
+                                <option value="informal">フレンドリー / カジュアル</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <!-- Mini Model Info -->
+                <div class="mt-auto p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
+                    <p class="text-[10px] text-emerald-500/60 uppercase font-black tracking-widest mb-1 italic">エンジン最適化</p>
+                    <p class="text-[9px] text-slate-500 leading-tight">要約生成は、一貫性向上のために<span class="text-emerald-400">4096トークン</span>のコンテキストウィンドウで最適化されています。</p>
+                </div>
+            </aside>
+
+            <!-- Results Display Area -->
+            <section class="flex-1 flex flex-col p-8 relative min-h-0 min-w-0 bg-slate-900/10 h-full">
+                <div id="aiAnalysisResultsArea" class="flex-1 overflow-y-auto custom-scrollbar max-w-4xl mx-auto w-full pb-32 h-full">
+                    <div id="summaryPlaceholder" class="flex flex-col items-center justify-center h-full text-slate-800 opacity-30 space-y-4">
+                        <i data-lucide="cpu" class="w-24 h-24 stroke-[1px]"></i>
+                        <div class="text-center">
+                            <p class="text-xl font-bold uppercase tracking-widest">AI分析デスク</p>
+                            <p class="text-[10px] tracking-[0.4em]">コマンド待機中</p>
+                        </div>
+                    </div>
+
+                    <!-- Loading Indicator Internal (Hidden by default) -->
+                    <div id="loadingIndicator" class="hidden flex-col items-center justify-center h-full absolute inset-0 z-50 bg-slate-950/40 backdrop-blur-sm">
+                      <div class="relative w-24 h-24 mb-6">
+                          <div class="absolute inset-0 rounded-full border-2 border-slate-800"></div>
+                          <div class="absolute inset-0 rounded-full border-t-2 border-emerald-500 animate-spin"></div>
+                          <div class="absolute inset-0 flex items-center justify-center">
+                              <i data-lucide="brain-circuit" class="w-8 h-8 text-emerald-500 animate-pulse"></i>
+                          </div>
+                      </div>
+                      <h3 class="text-emerald-100 font-bold uppercase tracking-[0.2em] mb-1">分析実行中...</h3>
+                      <div id="downloadProgressContainer" class="w-48 mt-4 h-0.5 bg-slate-800 rounded-full overflow-hidden hidden">
+                        <div id="downloadProgressBar" class="h-full bg-emerald-500 transition-all duration-300" style="width: 0%"></div>
+                      </div>
+                    </div>
+
+                    <div id="summaryDisplay" class="hidden prose prose-invert max-w-none text-slate-100 leading-relaxed text-lg"></div>
+                </div>
+
+                <!-- Analysis Bottom Actions -->
+                <div id="aiActionFooter" class="hidden absolute bottom-10 left-1/2 -translate-x-1/2 z-20 flex justify-center gap-4 bg-slate-900/80 p-6 border border-white/5 rounded-3xl backdrop-blur-xl shadow-2xl">
+                    <button id="copyAiBtn" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-3 rounded-2xl border border-slate-700 transition active:scale-95">
+                       <i data-lucide="copy" class="w-4 h-4"></i> 結果をコピー
+                    </button>
+                    <button id="downloadTextBtnModal" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-3 rounded-2xl border border-slate-700 transition active:scale-95">
+                       <i data-lucide="download" class="w-4 h-4"></i> ファイルを保存
+                    </button>
+                </div>
+            </section>
+        </div>
     </div>
 
     <!-- Main Logic as ES Module -->

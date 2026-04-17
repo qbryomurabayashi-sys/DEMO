@@ -1,7 +1,8 @@
 import { CreateMLCEngine, prebuiltAppConfig } from "@mlc-ai/web-llm";
 import mermaid from "mermaid";
+import { marked } from "marked";
 
-const APP_VERSION = "2.0.1";
+const APP_VERSION = "2.0.2";
 
 // Define custom models (Gemma 4 E4B/E2B) by mapping them to Gemma 2 2B weights for now
 // so they can actually load and run without ModelNotFoundError
@@ -50,7 +51,10 @@ let mediaRecorder = null, audioChunks = [], currentAudioBlob = null;
 let finalTranscript = '', interimTranscript = '', recognition = null, wakeLock = null;
 let currentSessionMap = new Map(); 
 let db = null; 
-let currentSessionId = null;
+let currentSessionId = localStorage.getItem('local_ai_current_session_id') ? parseInt(localStorage.getItem('local_ai_current_session_id')) : null;
+let lastSavedText = '';
+let lastSavedAi = '';
+let lastSavedAudioSize = 0;
 
 // WebLLM Engine
 let engine = null;
@@ -90,6 +94,9 @@ function checkRecovery() {
             }
         };
     }
+    
+    // Set lastSavedText to initial text to prevent immediate redundant save
+    lastSavedText = finalTranscript;
 }
 
 // --- PWA & Browser Checks ---
@@ -293,6 +300,15 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('closeSettingsBtn').addEventListener('click', () => document.getElementById('settingsModal').classList.add('hidden'));
     document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
 
+    // AI Modal Logic
+    const aiModal = document.getElementById('aiAnalysisModal');
+    document.getElementById('openAiPanelBtn').addEventListener('click', () => {
+        aiModal.classList.remove('hidden');
+    });
+    document.getElementById('closeAiModalBtn').addEventListener('click', () => {
+        aiModal.classList.add('hidden');
+    });
+
     // Sidebar & Tasks
     document.getElementById('toggleSidebarBtn').addEventListener('click', () => {
         document.getElementById('sidebar').classList.toggle('-translate-x-full');
@@ -300,14 +316,31 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('closeSidebarBtn').addEventListener('click', () => {
         document.getElementById('sidebar').classList.add('-translate-x-full');
     });
-    document.getElementById('showTasksBtn').addEventListener('click', () => {
-        document.getElementById('taskSelectionOverlay').classList.remove('-translate-y-full');
-    });
-    document.getElementById('hideTasksBtn').addEventListener('click', () => {
-        document.getElementById('taskSelectionOverlay').classList.add('-translate-y-full');
-    });
+    
     document.getElementById('newSessionBtn').addEventListener('click', startNewSession);
-    document.getElementById('downloadTextBtn').addEventListener('click', downloadAiOutput);
+    document.getElementById('downloadTextBtnModal').addEventListener('click', downloadAiOutput);
+
+    // AI Task Checkbox UI Enhancement (Manual toggle since they are hidden)
+    document.querySelectorAll('#aiTasksList label').forEach(label => {
+        const input = label.querySelector('input');
+        const iconContainer = label.querySelector('.w-4.h-4.rounded');
+        const checkIcon = iconContainer.querySelector('[data-lucide="check"]');
+
+        const updateUI = () => {
+            if (input.checked) {
+                iconContainer.classList.add('border-emerald-500', 'bg-emerald-500');
+                iconContainer.classList.remove('border-slate-600');
+                if (checkIcon) checkIcon.classList.remove('hidden');
+            } else {
+                iconContainer.classList.remove('border-emerald-500', 'bg-emerald-500');
+                iconContainer.classList.add('border-slate-600');
+                if (checkIcon) checkIcon.classList.add('hidden');
+            }
+        };
+
+        input.addEventListener('change', updateUI);
+        updateUI(); // Initial
+    });
 
     // Manual Memo
     const addManualMemo = () => {
@@ -463,6 +496,18 @@ async function saveSession() {
         sessionText += `[${item.time}] ${item.text}\n`;
     }
     const fullTextToSave = finalTranscript + sessionText;
+    const currentAiResults = document.getElementById('summaryDisplay').innerHTML;
+    const currentAudioSize = currentAudioBlob ? currentAudioBlob.size : 0;
+
+    // Prevent saving if content is identical to last saved state
+    if (fullTextToSave === lastSavedText && 
+        currentAiResults === lastSavedAi && 
+        currentAudioSize === lastSavedAudioSize && 
+        currentSessionId) return;
+        
+    lastSavedText = fullTextToSave;
+    lastSavedAi = currentAiResults;
+    lastSavedAudioSize = currentAudioSize;
 
     // Generate a cleaner title by stripping timestamps
     let cleanTitle = fullTextToSave.replace(/\[\d{2}:\d{2}:\d{2}\]\s*/g, '').substring(0, 30).trim() || '新規セッション';
@@ -488,6 +533,7 @@ async function saveSession() {
         const addReq = store.add(sessionData);
         addReq.onsuccess = (e) => {
             currentSessionId = e.target.result;
+            localStorage.setItem('local_ai_current_session_id', currentSessionId);
             loadHistory();
         };
     }
@@ -506,7 +552,11 @@ async function loadSession(id) {
         if (!session) return;
 
         currentSessionId = session.id;
+        localStorage.setItem('local_ai_current_session_id', currentSessionId);
         finalTranscript = session.text;
+        lastSavedText = session.text;
+        lastSavedAi = session.aiResults || '';
+        lastSavedAudioSize = session.audioBlob ? session.audioBlob.size : 0;
         currentAudioBlob = session.audioBlob;
         
         updateTranscriptionUI();
@@ -592,7 +642,11 @@ async function editSessionTitle(id, currentTitle) {
 
 function startNewSession() {
     currentSessionId = null;
+    localStorage.removeItem('local_ai_current_session_id');
     finalTranscript = '';
+    lastSavedText = '';
+    lastSavedAi = '';
+    lastSavedAudioSize = 0;
     interimTranscript = '';
     currentAudioBlob = null;
     currentSessionMap.clear();
@@ -710,12 +764,12 @@ async function startSplashAndInit() {
         
         localStorage.setItem(crashKey, (loadCount + 1).toString());
 
-        // Initialize engine with limited context window to save memory
+        // Initialize engine with expanded context window for better coherence
         engine = await CreateMLCEngine(modelName, { 
             appConfig: myAppConfig,
             initProgressCallback,
             chatOpts: {
-                context_window_size: 2048 // Limit context to prevent OOM
+                context_window_size: 4096 // Increased from 2048 for better accuracy
             }
         });
         engine.activeModel = modelName;
@@ -979,165 +1033,116 @@ async function generateSummary() {
     
     if (selectedTasks.length === 0) {
         alert("実行するAIタスクを選択してください。");
-        document.getElementById('taskSelectionOverlay').classList.remove('-translate-y-full');
         return;
     }
 
-    document.getElementById('taskSelectionOverlay').classList.add('-translate-y-full');
+    const length = document.getElementById('aiLengthSelect').value;
+    const tone = document.getElementById('aiToneSelect').value;
+
     document.getElementById('summaryPlaceholder').classList.add('hidden');
     document.getElementById('summaryDisplay').classList.remove('hidden');
     document.getElementById('summaryDisplay').innerHTML = "";
-    document.getElementById('copyAiBtn').classList.add('hidden');
-    document.getElementById('downloadTextBtn').classList.add('hidden');
+    document.getElementById('aiActionFooter').classList.add('hidden');
     
     const loadingIndicator = document.getElementById('loadingIndicator');
     const progressContainer = document.getElementById('downloadProgressContainer');
-    const loadingTitle = document.getElementById('loadingTitle');
-    const loadingSubtext = document.getElementById('loadingSubtext');
     
-    loadingIndicator.style.display = 'flex';
+    loadingIndicator.classList.remove('hidden');
     document.getElementById('generateBtn').disabled = true;
     isProcessingAI = true;
 
     try {
         // Initialize or Reload Engine if model changed
         if (!engine || engine.activeModel !== modelName) {
-            const isVeryLargeModel = modelName.includes('9b') || modelName.includes('gemma-3');
-            const isMediumModel = modelName.includes('3B') || modelName.includes('e4b') || modelName.includes('2b');
-            const sizeEstimate = isVeryLargeModel ? "約5〜6GB" : (isMediumModel ? "約2〜3GB" : "約1GB");
-
-            loadingTitle.innerText = "モデルを読み込み中...";
+            loadingIndicator.classList.remove('hidden');
             progressContainer.classList.remove('hidden');
-            progressContainer.style.display = 'flex';
-            loadingSubtext.innerText = `初回はモデルのダウンロードに時間がかかります（${sizeEstimate}）。Wi-Fi環境を推奨します。`;
             
             const initProgressCallback = (initProgress) => {
                 const progressPercent = Math.round(initProgress.progress * 100);
                 document.getElementById('downloadProgressBar').style.width = `${progressPercent}%`;
-                document.getElementById('downloadProgressText').innerText = `${progressPercent}% - ${initProgress.text}`;
             };
 
-            // Unload previous engine if it exists to free up memory
             if (engine) {
-                try {
-                    await engine.unload();
-                } catch (e) {
-                    console.warn("Failed to unload previous engine:", e);
-                }
+                try { await engine.unload(); } catch (e) {}
             }
 
-            engine = await CreateMLCEngine(
-                modelName,
-                { 
-                    appConfig: myAppConfig,
-                    initProgressCallback: initProgressCallback,
-                    chatOpts: {
-                        context_window_size: 2048 // Limit context to prevent OOM
-                    }
-                }
-            );
+            engine = await CreateMLCEngine(modelName, { 
+                appConfig: myAppConfig,
+                initProgressCallback: initProgressCallback,
+                chatOpts: { context_window_size: 4096 }
+            });
             engine.activeModel = modelName;
         }
 
-        loadingIndicator.style.display = 'none';
+        loadingIndicator.classList.add('hidden');
         const summaryDisplay = document.getElementById('summaryDisplay');
+
+        // Combined Context Header
+        const lengthText = length === 'short' ? '簡潔に（箇条書きメイン）' : (length === 'long' ? '詳細に（網羅的）' : '標準的な長さで');
+        const toneText = tone === 'formal' ? 'ですます調・ビジネス敬語' : (tone === 'informal' ? '親しみやすい口調' : '中立的な表現');
+
+        let accumulatedResults = "";
 
         for (const task of selectedTasks) {
             let prompt = "";
             let taskTitle = "";
 
+            const contextFlavor = `トーンは「${toneText}」で、長さは「${lengthText}」を意識してください。`;
+
             if (task === 'correction') {
                 taskTitle = "文字起こし補正";
-                prompt = `以下の文字起こしデータは音声認識によるものです。
-文脈（前後の文章の流れ）を判断して、誤字脱字を修正し、読みやすく正確な文章に整形してください。要約はせず、できるだけ全文のニュアンスを残して出力してください。
-出力は日本語で行ってください。
-
---- 文字起こしデータ ---\n${finalTranscript}`;
-            } else if (task === 'context_doc') {
-                taskTitle = "文脈考慮・公式文書";
-                prompt = `以下の文字起こしデータ全体を読み込み、文脈（前後の発言の関係性や意図）を深く考慮した上で、正確で読みやすい「公式な記録文書」を作成してください。
-単なる要約ではなく、議論の流れや決定に至る背景を論理的に整理してください。
-出力は日本語で行ってください。
-
---- 文字起こしデータ ---\n${finalTranscript}`;
+                prompt = `以下の文字起こしデータの誤字脱字を修正し、読みやすく整形してください。${contextFlavor}\n\n[文字起こしデータ]\n${finalTranscript}`;
             } else if (task === 'minutes') {
                 taskTitle = "議事録作成";
-                prompt = `以下の文字起こしデータから、ビジネス議事録を作成してください。出力は日本語で行ってください。\n\n【フォーマット】\n1. 会議の目的\n2. 決定事項\n3. 議題ごとの詳細\n4. Next Action（タスクと担当）\n\n--- 文字起こしデータ ---\n${finalTranscript}`;
+                prompt = `以下の内容から議事録を作成してください。${contextFlavor}\n決定事項やネクストアクションを明確に抽出してください。\n\n[内容]\n${finalTranscript}`;
+            } else if (task === 'todo') {
+                taskTitle = "TODO抽出";
+                prompt = `以下の内容から、誰がいつまでに何をすべきか（TODO）をリストアップしてください。${contextFlavor}\n\n[内容]\n${finalTranscript}`;
             }
 
-            // Create section in UI
+            // UI Section
             const section = document.createElement('div');
-            section.className = "bg-slate-800/50 rounded-lg border border-slate-700 overflow-hidden";
+            section.className = "mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500";
             section.innerHTML = `
-                <div class="px-4 py-2 border-b border-slate-700 bg-slate-800 flex justify-between items-center">
-                    <span class="text-xs font-bold text-emerald-400 tracking-widest uppercase">${taskTitle}</span>
-                    <div class="flex gap-2 items-center">
-                        <div class="task-loader w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
-                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 hidden task-done"></i>
-                    </div>
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="text-[10px] font-black bg-emerald-500 text-slate-950 px-2 py-0.5 rounded uppercase tracking-tighter">${taskTitle}</span>
+                    <div class="h-px flex-1 bg-slate-800"></div>
                 </div>
-                <div class="p-4 text-slate-300 leading-relaxed whitespace-pre-wrap task-content"></div>
+                <div class="task-content markdown-body text-slate-100 leading-relaxed min-h-[50px]"></div>
             `;
             summaryDisplay.appendChild(section);
-            lucide.createIcons();
 
             const contentDiv = section.querySelector('.task-content');
-            const loader = section.querySelector('.task-loader');
-            const doneIcon = section.querySelector('.task-done');
-
             const messages = [{ role: "user", content: prompt }];
-            // Add repetition_penalty to prevent infinite loops and max_tokens to prevent OOM
+            
             const chunks = await engine.chat.completions.create({ 
                 messages, 
                 stream: true,
-                temperature: 0.7,
-                repetition_penalty: 1.2, // Penalize repeated phrases
-                max_tokens: 1024
+                temperature: 0.6,
+                repetition_penalty: 1.1,
+                max_tokens: 2048
             });
 
             let reply = "";
             for await (const chunk of chunks) {
                 const content = chunk.choices[0]?.delta?.content || "";
                 reply += content;
-                contentDiv.innerText = reply;
-                summaryDisplay.parentElement.scrollTop = summaryDisplay.parentElement.scrollHeight;
+                if (content) {
+                    contentDiv.innerHTML = marked.parse(reply);
+                    document.getElementById('aiAnalysisResultsArea').scrollTop = document.getElementById('aiAnalysisResultsArea').scrollHeight;
+                }
             }
-
-            loader.classList.add('hidden');
-            doneIcon.classList.remove('hidden');
+            accumulatedResults += `## ${taskTitle}\n\n${reply}\n\n---\n\n`;
         }
 
-        document.getElementById('copyAiBtn').classList.remove('hidden');
-        document.getElementById('downloadTextBtn').classList.remove('hidden');
+        document.getElementById('aiActionFooter').classList.remove('hidden');
         saveSession();
 
     } catch (error) {
         console.error("WebLLM Error:", error);
-        
-        let errorMsg = error.message || String(error);
-        let isCrash = errorMsg.includes("Device was lost") || errorMsg.includes("Instance") || errorMsg.includes("disposed") || errorMsg.includes("memory");
-        let isUnsupported = (modelName.includes('Llama-3.2') || modelName.includes('gemma')) && errorMsg.includes("not found");
-        
-        const summaryDisplay = document.getElementById('summaryDisplay');
-        summaryDisplay.innerHTML = `
-            <div class="bg-red-900/20 border border-red-800 p-5 rounded-lg text-red-200">
-                <h3 class="font-bold text-lg mb-3 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-6 h-6 text-red-500"></i> AI処理エラー</h3>
-                <p class="text-sm mb-4 leading-relaxed">${isUnsupported ? `現在モデルの読み込みに対応待ちです。WebLLMのアップデートをお待ちください。` : (isCrash ? "メモリ不足によりAIエンジンがクラッシュしました。" : errorMsg)}</p>
-                <div class="bg-red-950/50 p-4 rounded border border-red-900/50 text-sm text-red-300 space-y-2">
-                    <p class="font-bold text-red-400">【解決方法】</p>
-                    <p>1. 画面右上の「WebLLM 設定」を開く</p>
-                    <p>2. モデルを変更して保存</p>
-                    <p>3. ページを再読み込みする</p>
-                    <p class="text-xs mt-2 opacity-80">※他のタブやアプリを閉じると改善する場合があります。</p>
-                </div>
-            </div>
-        `;
-        lucide.createIcons();
-        
-        // Try to recover engine state
-        engine = null;
+        summaryDisplay.innerHTML = `<div class="p-6 bg-red-900/20 border border-red-800 rounded-2xl text-red-200">AI処理中にエラーが発生しました: ${error.message}</div>`;
     } finally {
-        loadingIndicator.style.display = 'none';
+        loadingIndicator.classList.add('hidden');
         document.getElementById('generateBtn').disabled = false;
         isProcessingAI = false;
     }
@@ -1205,7 +1210,7 @@ ${manualMemos || "（なし）"}
         const sessionTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
         summaryContainer.innerHTML = `
             <div class="text-[10px] font-bold text-emerald-400/60 mb-2 flex items-center gap-1 uppercase tracking-tighter">
-                <i data-lucide="refresh-cw" class="w-3 h-3 animate-spin"></i> LIVE OVERALL SUMMARY (LAST UPDATED: ${sessionTime})
+                <i data-lucide="refresh-cw" class="w-3 h-3 animate-spin"></i> 随時更新中の全体要約 (最終更新: ${sessionTime})
             </div>
             <div class="content whitespace-pre-wrap break-words text-emerald-50 text-sm leading-relaxed"></div>
         `;
@@ -1244,7 +1249,8 @@ async function handleSave(blob, ext, desc) {
 }
 
 function downloadAiOutput() {
-    const content = document.getElementById('summaryDisplay').innerText;
+    const summaryDisplay = document.getElementById('summaryDisplay');
+    const content = summaryDisplay.innerText;
     const blob = new Blob([content], { type: 'text/plain' });
     handleSave(blob, '.txt', 'AI分析結果');
 }
