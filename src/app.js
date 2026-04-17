@@ -890,7 +890,8 @@ function initApp() {
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
         recognition.lang = 'ja-JP'; 
-        recognition.continuous = true; 
+        // スマホ(特にAndroid Chrome)ではcontinuous=trueだとisFinalが細切れに連続して発火するバグがあるため無効化する
+        recognition.continuous = !isMobile; 
         recognition.interimResults = !isMobile; // Disable interim on mobile for stability
         recognition.maxAlternatives = 1;
         
@@ -913,7 +914,33 @@ function initApp() {
                     if (!text) continue; 
                     
                     const timestampStr = `[${currentTime}] `;
-                    finalTranscript += timestampStr + text + '\n';
+                    
+                    // モバイル等のバグで細切れのテキストが連続で送信される場合の重複・成長テキストを統合する
+                    let isMerged = false;
+                    if (finalTranscript.length > 0) {
+                        const lines = finalTranscript.trimEnd().split('\n');
+                        const lastLine = lines[lines.length - 1];
+                        const match = lastLine.match(/^\[.*?\] (.*)$/);
+                        
+                        if (match) {
+                            const lastContent = match[1];
+                            // 新しいテキストが直前のテキストを含んで成長している場合、最後の行を上書きする
+                            // "戻っ" -> "戻って" -> "戻ってき" のようなケースに対応
+                            if (text.startsWith(lastContent)) {
+                                lines[lines.length - 1] = timestampStr + text;
+                                finalTranscript = lines.join('\n') + '\n';
+                                isMerged = true;
+                            } else if (lastContent === text) {
+                                // 完全一致する重複送信は無視する
+                                isMerged = true;
+                            }
+                        }
+                    }
+                    
+                    if (!isMerged) {
+                        finalTranscript += timestampStr + text + '\n';
+                    }
+                    
                     localStorage.setItem('local_ai_assistant_text', finalTranscript);
                     
                     // Limit text size in localStorage to avoid crash
