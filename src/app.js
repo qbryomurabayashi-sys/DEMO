@@ -1,6 +1,8 @@
 import { CreateMLCEngine, prebuiltAppConfig } from "@mlc-ai/web-llm";
 import mermaid from "mermaid";
 
+const APP_VERSION = "2.0.1";
+
 // Define custom models (Gemma 4 E4B/E2B) by mapping them to Gemma 2 2B weights for now
 // so they can actually load and run without ModelNotFoundError
 const customModelList = [
@@ -153,25 +155,58 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     initApp();
     
+    // Version check for mandatory setup/update
+    const savedVersion = localStorage.getItem('app_version');
+    const isNewVersion = savedVersion !== APP_VERSION;
+    const modelSelect = document.getElementById('modelNameInput');
+    
     // Device detection for default model (Move here to use in splash)
     let savedModel = localStorage.getItem('webllm_model');
-    // REMOVED migration from gemma-4 to llama (User requested to keep Gemma 4)
     
-    const modelSelect = document.getElementById('modelNameInput');
-    if (savedModel && Array.from(modelSelect.options).some(opt => opt.value === savedModel)) {
-        modelSelect.value = savedModel;
+    if (isNewVersion) {
+        const setupModal = document.getElementById('setupModal');
+        const setupModalMessage = document.getElementById('setupModalMessage');
+        const finishSetupBtn = document.getElementById('finishSetupBtn');
+        
+        if (!savedVersion) {
+            setupModalMessage.innerText = "ご利用ありがとうございます。最高のAI体験を提供するため、初期セットアップを行います。推奨モデル（GEMMA 4）を選択してください。";
+        } else {
+            setupModalMessage.innerHTML = `バージョンが <strong>${savedVersion}</strong> から <strong>${APP_VERSION}</strong> へアップデートされました。<br>最新のAIエンジンに合わせて、使用するモデルを再選択してください。`;
+        }
+        
+        setupModal.classList.remove('hidden');
+        lucide.createIcons();
+        
+        finishSetupBtn.addEventListener('click', () => {
+            const selectedModel = document.querySelector('input[name="setupModel"]:checked').value;
+            localStorage.setItem('webllm_model', selectedModel);
+            localStorage.setItem('app_version', APP_VERSION);
+            setupModal.classList.add('hidden');
+            
+            // Re-sync UI
+            modelSelect.value = selectedModel;
+            
+            startSplashAndInit();
+        }, { once: true });
+        
     } else {
-        // Default to Llama 3.2 3B
-        modelSelect.value = 'Llama-3.2-3B-Instruct-q4f16_1-MLC';
+        // Normal Startup
+        if (savedModel && Array.from(modelSelect.options).some(opt => opt.value === savedModel)) {
+            modelSelect.value = savedModel;
+        } else {
+            // Default to Gemma 4 4B for v2.0+
+            modelSelect.value = 'gemma-4-e4b-it-q4f16_1-MLC';
+            localStorage.setItem('webllm_model', modelSelect.value);
+        }
+        
+        startSplashAndInit();
     }
 
-    // Start Splash & Engine Pre-init
+    // Start Splash Model Change button
     document.getElementById('splashChangeModelBtn').addEventListener('click', () => {
         document.getElementById('settingsModal').classList.remove('hidden');
         document.getElementById('settingsModal').style.zIndex = "200"; // Ensure it's above splash
     });
-
-    await startSplashAndInit();
 
     // Buttons
     document.getElementById('recBtn').addEventListener('click', toggleRecording);
@@ -198,7 +233,22 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Settings
-    document.getElementById('settingsBtn').addEventListener('click', () => document.getElementById('settingsModal').classList.remove('hidden'));
+    const modelWarning = document.getElementById('modelChangeWarning');
+    const initialModel = localStorage.getItem('webllm_model') || 'gemma-4-e4b-it-q4f16_1-MLC';
+
+    modelSelect.addEventListener('change', () => {
+        if (modelSelect.value !== initialModel) {
+            modelWarning.classList.remove('hidden');
+        } else {
+            modelWarning.classList.add('hidden');
+        }
+    });
+
+    document.getElementById('settingsBtn').addEventListener('click', () => {
+        modelSelect.value = localStorage.getItem('webllm_model') || initialModel;
+        modelWarning.classList.add('hidden');
+        document.getElementById('settingsModal').classList.remove('hidden');
+    });
     document.getElementById('closeSettingsBtn').addEventListener('click', () => document.getElementById('settingsModal').classList.add('hidden'));
     document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
 
@@ -292,11 +342,14 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 function saveSettings() {
-    localStorage.setItem('webllm_model', document.getElementById('modelNameInput').value);
+    const newModel = document.getElementById('modelNameInput').value;
+    const oldModel = localStorage.getItem('webllm_model');
+    
+    localStorage.setItem('webllm_model', newModel);
     document.getElementById('settingsModal').classList.add('hidden');
     
-    // If splash is visible, reload to apply new model
-    if (document.getElementById('splashScreen')) {
+    // Reload if model changed OR if splash is visible
+    if (newModel !== oldModel || document.getElementById('splashScreen')) {
         location.reload();
     }
 }
@@ -593,7 +646,7 @@ async function startSplashAndInit() {
         // If progress is less than 1, it's likely downloading or doing heavy work
         if (initProgress.progress < 1) {
             splashLoadingArea.classList.remove('opacity-0');
-            splashSubtext.innerText = "AIモデルを準備中（初回は数分かかります）...";
+            splashSubtext.innerText = "AIモデルをダウンロード中（初回やモデル変更時は大容量の通信が発生します）...";
             
             if (downloadStartTime === null) {
                 downloadStartTime = Date.now();
@@ -675,23 +728,32 @@ async function startSplashAndInit() {
         setTimeout(() => splashScreen.remove(), 700);
     } catch (err) {
         console.error("Splash Init Error:", err);
-        if (modelName.includes('Llama-3.2')) {
-            splashStatusText.innerText = `現在モデルの読み込みに対応待ちです。`;
-            splashSubtext.innerText = "WebLLMの最新バージョンへのアップデートをお待ちください。";
-            splashLoadingArea.classList.remove('opacity-0');
-            splashChangeModelBtn.classList.add('animate-bounce', 'text-blue-400', 'border-blue-400');
+        const errStr = err.message || String(err);
+        splashStatusText.innerText = "エンジンの起動に失敗しました";
+        
+        if (errStr.includes("shader-f16")) {
+            splashSubtext.innerText = "お使いのGPUが 'shader-f16' 機能をサポートしていません。別のモデル（Llama 3.2 1Bなど）をお試しください。";
+        } else if (errStr.includes("memory") || errStr.includes("buffer") || errStr.includes("Device was lost")) {
+            splashSubtext.innerText = "VRAM（ビデオメモリ）不足またはGPUエラーが発生しました。他のタブを閉じるか、軽量モデルを使用してください。";
+        } else if (modelName.includes('Llama-3.2') && errStr.includes("not found")) {
+            splashSubtext.innerText = "WebLLMの最新バージョンへのアップデート待ちです。別のモデルを選択してください。";
         } else {
-            splashStatusText.innerText = "WebGPUの初期化に失敗しました。";
-            splashSubtext.innerText = "お使いのブラウザがWebGPUをサポートしているか確認してください。";
-            await minTimer;
-            splashScreen.classList.add('opacity-0');
-            setTimeout(() => splashScreen.remove(), 700);
+            splashSubtext.innerText = `エラー内容: ${errStr.substring(0, 100)}... 設定からモデルを変更してください。`;
         }
+        
+        splashLoadingArea.classList.remove('opacity-0');
+        splashChangeModelBtn.classList.add('animate-bounce', 'text-blue-400', 'border-blue-400', 'border-2');
+        
+        // Show the persistent error area
+        showError(`起動エラー: ${errStr}`);
     }
 }
 
 // --- App Initialization ---
 function initApp() {
+    if (!navigator.gpu) {
+        showError("CRITICAL ERR: WebGPUがサポートされていないか、無効になっています。Chrome / Edge の最新版を使用し、GPUアクセラレーションを有効にしてください。");
+    }
     updateMicList();
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
