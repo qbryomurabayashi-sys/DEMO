@@ -321,13 +321,12 @@
             <label class="block text-sm font-bold text-slate-300 mb-1">AIモデル選択 (速度 vs 精度)</label>
             <select id="modelNameInput" class="w-full bg-slate-900 border border-slate-600 rounded-md px-4 py-2.5 text-sm text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition font-mono">
               <optgroup label="Gemma シリーズ">
-                <option value="gemma-4-e4b-it-q4f16_1-MLC" selected>🔥 Gemma 4 4B (試験実装・最強クラス)</option>
-                <option value="gemma-4-E2B-it-q4f16_1-MLC">✨ Gemma 4 2B (最新・軽量)</option>
-                <option value="gemma-3-9b-it-q4f16_1-MLC">🧠 Gemma 3 9B (高精度モデル・強制読込)</option>
+                <option value="gemma-2-2b-it-q4f16_1-MLC" selected>✨ Gemma 2 2B (軽量・安定)</option>
+                <option value="gemma-2-9b-it-q4f16_1-MLC">🧠 Gemma 2 9B (高精度)</option>
               </optgroup>
               <optgroup label="Llama シリーズ">
-                <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">🎙️ Llama 3.2 3B (標準・高精度)</option>
-                <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">⚡ Llama 3.2 1B (高速・軽量)</option>
+                <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">🎙️ Llama 3.2 3B (標準・高機能)</option>
+                <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">⚡ Llama 3.2 1B (高速・超軽量)</option>
               </optgroup>
             </select>
             <p class="text-xs text-slate-500 mt-1.5">※初回実行時にブラウザのキャッシュにモデルがダウンロードされます。</p>
@@ -364,29 +363,29 @@
             <span class="text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-2 block">推奨モデルを選択してください</span>
             
             <label class="flex items-center gap-4 p-4 bg-slate-800/50 rounded-xl border-2 border-slate-700 cursor-pointer hover:border-blue-500 transition group has-[:checked]:border-blue-600 has-[:checked]:bg-blue-900/10">
-              <input type="radio" name="setupModel" value="gemma-4-e4b-it-q4f16_1-MLC" checked class="w-5 h-5 text-blue-600 focus:ring-blue-500 bg-slate-800 border-slate-700">
+              <input type="radio" name="setupModel" value="gemma-2-2b-it-q4f16_1-MLC" checked class="w-5 h-5 text-blue-600 focus:ring-blue-500 bg-slate-800 border-slate-700">
               <div class="flex-1">
                 <div class="flex items-center gap-2">
-                  <span class="font-bold text-slate-100 italic">GEMMA 4 4B (最強推奨)</span>
-                  <span class="bg-blue-600 text-[9px] px-1.5 py-0.5 rounded-sm font-bold uppercase text-white">PREMIER</span>
+                  <span class="font-bold text-slate-100 italic">GEMMA 2 2B (推奨)</span>
+                  <span class="bg-blue-600 text-[9px] px-1.5 py-0.5 rounded-sm font-bold uppercase text-white">STANDARD</span>
                 </div>
-                <p class="text-[10px] text-slate-400">最高の補正精度と推論能力を持つ最新モデル</p>
+                <p class="text-[10px] text-slate-400">軽量で安定した処理能力を持つ推奨モデル</p>
               </div>
             </label>
 
             <label class="flex items-center gap-4 p-4 bg-slate-800/50 rounded-xl border-2 border-slate-700 cursor-pointer hover:border-emerald-500 transition group has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-900/10">
-              <input type="radio" name="setupModel" value="gemma-3-9b-it-q4f16_1-MLC" class="w-5 h-5 text-emerald-600 focus:ring-emerald-500 bg-slate-800 border-slate-700">
+              <input type="radio" name="setupModel" value="Llama-3.2-3B-Instruct-q4f16_1-MLC" class="w-5 h-5 text-emerald-600 focus:ring-emerald-500 bg-slate-800 border-slate-700">
               <div class="flex-1">
-                <span class="font-bold text-slate-100">GEMMA 3 9B (高精度)</span>
-                <p class="text-[10px] text-slate-400">安定した処理能力。大容量ダウンロードが必要です。</p>
+                <span class="font-bold text-slate-100">Llama 3.2 3B (高機能)</span>
+                <p class="text-[10px] text-slate-400">少し重めの高精度な標準モデル</p>
               </div>
             </label>
 
             <label class="flex items-center gap-4 p-4 bg-slate-800/50 rounded-xl border-2 border-slate-700 cursor-pointer hover:border-slate-500 transition group has-[:checked]:border-slate-400 has-[:checked]:bg-slate-700/20">
-              <input type="radio" name="setupModel" value="Llama-3.2-3B-Instruct-q4f16_1-MLC" class="w-5 h-5 text-slate-300 focus:ring-slate-500 bg-slate-800 border-slate-700">
+              <input type="radio" name="setupModel" value="Llama-3.2-1B-Instruct-q4f16_1-MLC" class="w-5 h-5 text-slate-300 focus:ring-slate-500 bg-slate-800 border-slate-700">
               <div class="flex-1">
-                <span class="font-bold text-slate-100">Llama 3.2 3B (標準)</span>
-                <p class="text-[10px] text-slate-400">軽量さと精度のバランスが取れた標準モデル</p>
+                <span class="font-bold text-slate-100">Llama 3.2 1B (高速/軽量)</span>
+                <p class="text-[10px] text-slate-400">スマホなどの低スペック環境に適した高速モデル</p>
               </div>
             </label>
           </div>

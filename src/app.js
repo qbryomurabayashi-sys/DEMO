@@ -33,41 +33,13 @@ async function loadMermaid() {
     }
 }
 
-const APP_VERSION = "2.0.3";
-
-// Define custom models (Gemma 4 E4B/E2B) by mapping them to Gemma 2 2B weights for now
-const customModelList = [
-    {
-        model_id: "gemma-4-e4b-it-q4f16_1-MLC",
-        model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/gemma-2-2b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm",
-        vram_required_MB: 1895.3,
-        low_resource_required: false,
-        required_features: ["shader-f16"],
-        model: "https://huggingface.co/mlc-ai/gemma-2-2b-it-q4f16_1-MLC"
-    },
-    {
-        model_id: "gemma-4-E2B-it-q4f16_1-MLC",
-        model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/gemma-2-2b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm",
-        vram_required_MB: 1583.3,
-        low_resource_required: true,
-        required_features: ["shader-f16"],
-        model: "https://huggingface.co/welcoma/gemma-4-E2B-it-q4f16_1-MLC"
-    },
-    {
-        model_id: "gemma-3-9b-it-q4f16_1-MLC",
-        model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/gemma-2-9b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm",
-        vram_required_MB: 5000,
-        low_resource_required: false,
-        required_features: ["shader-f16"],
-        model: "https://huggingface.co/mlc-ai/gemma-2-9b-it-q4f16_1-MLC"
-    }
-];
+const APP_VERSION = "2.1.0";
 
 // Config getter
 async function getAppConfig() {
     await loadAiLibraries();
     return {
-        model_list: [...prebuiltAppConfig.model_list, ...customModelList]
+        model_list: prebuiltAppConfig.model_list
     };
 }
 
@@ -163,7 +135,7 @@ function showSetupModal(oldVer, newVer) {
     const modelSelect = document.getElementById('modelNameInput');
 
     if (!oldVer) {
-        setupModalMessage.innerText = "ご利用ありがとうございます。最高のAI体験を提供するため、初期セットアップを行います。推奨モデル（GEMMA 4）を選択してください。";
+        setupModalMessage.innerText = "ご利用ありがとうございます。最高のAI体験を提供するため、初期セットアップを行います。推奨モデル（GEMMA 2 / Llama 3）を選択してください。";
     } else {
         setupModalMessage.innerHTML = `バージョンが <strong>${oldVer}</strong> から <strong>${newVer}</strong> へアップデートされました。<br>最新のAIエンジンに合わせて、使用するモデルを再選択してください。`;
     }
@@ -260,8 +232,8 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (savedModel && Array.from(modelSelect.options).some(opt => opt.value === savedModel)) {
             modelSelect.value = savedModel;
         } else {
-            // Default to Gemma 4 4B for v2.0+
-            modelSelect.value = 'gemma-4-e4b-it-q4f16_1-MLC';
+            // Default to Gemma 2 2B for v2.1+
+            modelSelect.value = 'gemma-2-2b-it-q4f16_1-MLC';
             localStorage.setItem('webllm_model', modelSelect.value);
         }
         
