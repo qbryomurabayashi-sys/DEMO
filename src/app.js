@@ -33,13 +33,41 @@ async function loadMermaid() {
     }
 }
 
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.1.1";
+
+// Define custom models (Gemma 4 E4B/E2B)
+const customModelList = [
+    {
+        model_id: "gemma-4-e4b-it-q4f16_1-MLC",
+        model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/gemma-2-2b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm",
+        vram_required_MB: 1895.3,
+        low_resource_required: false,
+        required_features: ["shader-f16"],
+        model: "https://huggingface.co/mlc-ai/gemma-2-2b-it-q4f16_1-MLC"
+    },
+    {
+        model_id: "gemma-4-E2B-it-q4f16_1-MLC",
+        model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/gemma-2-2b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm",
+        vram_required_MB: 1583.3,
+        low_resource_required: true,
+        required_features: ["shader-f16"],
+        model: "https://huggingface.co/welcoma/gemma-4-E2B-it-q4f16_1-MLC"
+    },
+    {
+        model_id: "gemma-3-9b-it-q4f16_1-MLC",
+        model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/gemma-2-9b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm",
+        vram_required_MB: 5000,
+        low_resource_required: false,
+        required_features: ["shader-f16"],
+        model: "https://huggingface.co/mlc-ai/gemma-2-9b-it-q4f16_1-MLC"
+    }
+];
 
 // Config getter
 async function getAppConfig() {
     await loadAiLibraries();
     return {
-        model_list: prebuiltAppConfig.model_list
+        model_list: [...prebuiltAppConfig.model_list, ...customModelList]
     };
 }
 
@@ -62,6 +90,11 @@ let lastSavedAudioSize = 0;
 // WebLLM Engine
 let realtimeAiBuffer = '';
 let isRealtimeProcessing = false;
+
+// Whisper STT 
+let whisperTranscriber = null;
+let whisperActive = false;
+let whisperLoading = false;
 
 // --- IndexedDB Initialization (Audio & Session Backup) ---
 const dbReq = indexedDB.open("LocalAIAssistantDB", 2);
@@ -223,6 +256,31 @@ window.addEventListener('DOMContentLoaded', async () => {
     const effectiveVersion = remoteVersion || APP_VERSION;
     const isNewVersion = savedVersion !== effectiveVersion;
     
+    // Apply STT Engine globally
+    const currentStt = localStorage.getItem('stt_engine') || 'webspeech';
+    localStorage.setItem('stt_engine_applied', currentStt);
+    const sttSelect = document.getElementById('sttEngineSelect');
+    if (sttSelect) sttSelect.value = currentStt;
+
+    if (currentStt === 'whisper-tiny') {
+        whisperActive = true;
+        try {
+            document.getElementById('setupModalMessage').innerText = "完全オフラインモード(Whisper)の初期化中...\n※初回はモデルのダウンロードに時間がかかります";
+            const loadingInd = document.getElementById('loadingIndicator');
+            loadingInd.classList.remove('hidden');
+            const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3');
+            whisperTranscriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
+                device: navigator.gpu ? 'webgpu' : 'wasm'
+            });
+            loadingInd.classList.add('hidden');
+        } catch(e) {
+            console.error("Whisper Initialization error", e);
+            showError("Whisperの読み込みに失敗しました。標準モードを使用します。");
+            whisperActive = false;
+            document.getElementById('loadingIndicator').classList.add('hidden');
+        }
+    }
+    
     if (isNewVersion) {
         showSetupModal(savedVersion, effectiveVersion);
     } else {
@@ -304,6 +362,10 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('settingsBtn').addEventListener('click', () => {
         modelSelect.value = localStorage.getItem('webllm_model') || initialModel;
+        const savedStt = localStorage.getItem('stt_engine') || 'webspeech';
+        const sttSelect = document.getElementById('sttEngineSelect');
+        if(sttSelect) sttSelect.value = savedStt;
+        
         modelWarning.classList.add('hidden');
         document.getElementById('settingsModal').classList.remove('hidden');
     });
@@ -424,12 +486,16 @@ window.addEventListener('DOMContentLoaded', async () => {
 function saveSettings() {
     const newModel = document.getElementById('modelNameInput').value;
     const oldModel = localStorage.getItem('webllm_model');
+    const sttEngine = document.getElementById('sttEngineSelect')?.value || 'webspeech';
     
     localStorage.setItem('webllm_model', newModel);
+    localStorage.setItem('stt_engine', sttEngine);
+
     document.getElementById('settingsModal').classList.add('hidden');
     
-    // Reload if model changed OR if splash is visible
-    if (newModel !== oldModel || document.getElementById('splashScreen')) {
+    // Reload if model or STT changed OR if splash is visible
+    if (newModel !== oldModel || sttEngine !== (localStorage.getItem('stt_engine_applied') || 'webspeech') || document.getElementById('splashScreen')) {
+        localStorage.setItem('stt_engine_applied', sttEngine);
         location.reload();
     }
 }
@@ -876,6 +942,7 @@ function initApp() {
         };
 
         recognition.onresult = (event) => {
+            if (whisperActive) return;
             let interim = '';
             const currentTime = document.getElementById('timerDisplay').innerText;
 
@@ -935,7 +1002,7 @@ function initApp() {
         };
 
         recognition.onend = () => { 
-            if (isRecording) { 
+            if (isRecording && !whisperActive) { 
                 // Restart recognition to overcome timeout
                 setTimeout(() => {
                     if (isRecording) {
@@ -1039,7 +1106,7 @@ async function toggleRecording() {
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
             mediaRecorder.stop(); mediaRecorder.stream.getTracks().forEach(t => t.stop());
         }
-        if (recognition) {
+        if (recognition && !whisperActive) {
             try { recognition.stop(); } catch(e){}
             
             if (interimTranscript) {
@@ -1050,11 +1117,15 @@ async function toggleRecording() {
             saveSession();
         }
 
-        setTimeout(() => {
+        setTimeout(async () => {
             if(audioChunks.length > 0) {
                 const mimeType = mediaRecorder ? mediaRecorder.mimeType : 'audio/webm';
                 currentAudioBlob = new Blob(audioChunks, { type: mimeType });
                 document.getElementById('downloadAudioBtn').disabled = false;
+                
+                if (whisperActive && whisperTranscriber) {
+                    await runWhisperTranscription(currentAudioBlob);
+                }
             }
         }, 200);
 
@@ -1075,7 +1146,7 @@ async function toggleRecording() {
             document.getElementById('sysErrorArea').classList.add('hidden');
             await requestWakeLock();
 
-            if (recognition) { try { currentSessionMap.clear(); recognition.start(); } catch(e){} }
+            if (recognition && !whisperActive) { try { currentSessionMap.clear(); recognition.start(); } catch(e){} }
             mediaRecorder.ondataavailable = (e) => { 
                 if (e.data.size > 0) {
                     audioChunks.push(e.data); 
@@ -1106,6 +1177,43 @@ async function toggleRecording() {
                 document.getElementById('timerDisplay').innerText = `${h}:${m}:${s}`;
             }, 1000);
         } catch (err) { showError(`ERR [${err.name}]: マイク起動失敗。`); }
+    }
+}
+
+async function runWhisperTranscription(blob) {
+    try {
+        const timerDisplay = document.getElementById('timerDisplay').innerText;
+        interimTranscript = "\n(完全オフライン処理中: Whisper が音声を認識しています... デバイスの設定によっては時間がかかります)";
+        updateTranscriptionUI();
+        
+        document.getElementById('sysErrorArea').classList.add('hidden');
+        
+        const arrayBuffer = await blob.arrayBuffer();
+        const whisperAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        const decoded = await whisperAudioContext.decodeAudioData(arrayBuffer);
+        const audioData = decoded.getChannelData(0); 
+        
+        // chunk_length_s enables long form audio processing
+        const output = await whisperTranscriber(audioData, {
+            language: 'japanese',
+            task: 'transcribe',
+            chunk_length_s: 30, 
+            stride_length_s: 5,
+        });
+
+        const recognizedText = Array.isArray(output) ? output.map(t => t.text).join(' ') : output.text;
+        
+        interimTranscript = '';
+        if (recognizedText && recognizedText.trim() !== '') {
+            finalTranscript += `\n[${timerDisplay}] ${recognizedText.trim()}\n`;
+        }
+        updateTranscriptionUI();
+        saveSession();
+    } catch(err) {
+        console.error("Whisper Error:", err);
+        showError("オフライン認識エラー: " + err.message);
+        interimTranscript = '';
+        updateTranscriptionUI();
     }
 }
 
@@ -1163,31 +1271,38 @@ async function generateSummary() {
     isProcessingAI = true;
 
     try {
-        // Initialize or Reload Engine if model changed
-        if (!engine || engine.activeModel !== modelName) {
-            loadingIndicator.classList.remove('hidden');
-            progressContainer.classList.remove('hidden');
-            
-            const initProgressCallback = (initProgress) => {
-                const progressPercent = Math.round(initProgress.progress * 100);
-                document.getElementById('downloadProgressBar').style.width = `${progressPercent}%`;
-            };
+        const isOllama = modelName.startsWith('OLLAMA:');
+        let ollamaTargetModel = 'gemma4:e4b';
+        if (isOllama) {
+            ollamaTargetModel = modelName.split(':')[2] === 'e2b' ? 'gemma4:e2b' : 'gemma4:e4b';
+            loadingIndicator.classList.add('hidden'); // Doesn't need WebLLM loading bar
+        } else {
+            // Initialize or Reload Engine if model changed
+            if (!engine || engine.activeModel !== modelName) {
+                loadingIndicator.classList.remove('hidden');
+                progressContainer.classList.remove('hidden');
+                
+                const initProgressCallback = (initProgress) => {
+                    const progressPercent = Math.round(initProgress.progress * 100);
+                    document.getElementById('downloadProgressBar').style.width = `${progressPercent}%`;
+                };
 
-            if (engine) {
-                try { await engine.unload(); } catch (e) {}
+                if (engine) {
+                    try { await engine.unload(); } catch (e) {}
+                }
+
+                await loadAiLibraries();
+                const myAppConfig = await getAppConfig();
+                engine = await CreateMLCEngine(modelName, { 
+                    appConfig: myAppConfig,
+                    initProgressCallback: initProgressCallback,
+                    chatOpts: { context_window_size: 4096 }
+                });
+                engine.activeModel = modelName;
             }
-
-            await loadAiLibraries();
-            const myAppConfig = await getAppConfig();
-            engine = await CreateMLCEngine(modelName, { 
-                appConfig: myAppConfig,
-                initProgressCallback: initProgressCallback,
-                chatOpts: { context_window_size: 4096 }
-            });
-            engine.activeModel = modelName;
+            loadingIndicator.classList.add('hidden');
         }
 
-        loadingIndicator.classList.add('hidden');
         const summaryDisplay = document.getElementById('summaryDisplay');
 
         // Combined Context Header
@@ -1248,13 +1363,52 @@ ${finalTranscript}`;
             const contentDiv = section.querySelector('.task-content');
             const messages = [{ role: "user", content: prompt }];
             
-            const chunks = await engine.chat.completions.create({ 
-                messages, 
-                stream: true,
-                temperature: 0.2, // Lowered for higher factuality
-                repetition_penalty: 1.15,
-                max_tokens: 2048
-            });
+            let chunks;
+            if (isOllama) {
+                const response = await fetch("http://localhost:11434/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        model: ollamaTargetModel,
+                        messages: messages,
+                        options: { temperature: 0.2 },
+                        stream: true
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Ollama エラー: ローカル(localhost:11434)でOllamaが起動していないか、通信に失敗しました。`);
+                }
+                
+                async function* iterOllama(res) {
+                    const reader = res.body.getReader();
+                    const decoder = new TextDecoder();
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        const text = decoder.decode(value, { stream: true });
+                        const lines = text.split("\n");
+                        for (const line of lines) {
+                            if (!line.trim()) continue;
+                            try {
+                                const data = JSON.parse(line);
+                                if (data.message && data.message.content) {
+                                    yield { choices: [{ delta: { content: data.message.content } }] };
+                                }
+                            } catch(e) {}
+                        }
+                    }
+                }
+                chunks = iterOllama(response);
+            } else {
+                chunks = await engine.chat.completions.create({ 
+                    messages, 
+                    stream: true,
+                    temperature: 0.2, // Lowered for higher factuality
+                    repetition_penalty: 1.15,
+                    max_tokens: 2048
+                });
+            }
 
             let reply = "";
             for await (const chunk of chunks) {
@@ -1282,8 +1436,15 @@ ${finalTranscript}`;
 }
 
 async function processRealtimeAI() {
+    const modelName = document.getElementById('modelNameInput')?.value || 'gemma-2-2b-it-q4f16_1-MLC';
+    const isOllama = modelName.startsWith('OLLAMA:');
+    let ollamaTargetModel = 'gemma4:e4b';
+    if (isOllama) {
+        ollamaTargetModel = modelName.split(':')[2] === 'e2b' ? 'gemma4:e2b' : 'gemma4:e4b';
+    }
+
     // Increase buffer requirement to 100 chars for overall context
-    if (!engine || isRealtimeProcessing || realtimeAiBuffer.length < 100) return;
+    if ((!engine && !isOllama) || isRealtimeProcessing || realtimeAiBuffer.length < 100) return;
     
     const isRealtimeEnabled = document.getElementById('realtimeAiToggle');
     if (isRealtimeEnabled && !isRealtimeEnabled.checked) {
@@ -1318,12 +1479,46 @@ ${manualMemos || "（特になし）"}
 --- 現時点までの要約 (箇条書き) ---`;
 
         const messages = [{ role: "user", content: prompt }];
-        const chunks = await engine.chat.completions.create({ 
-            messages, 
-            stream: true,
-            temperature: 0.1, 
-            max_tokens: 600
-        });
+        
+        let chunks;
+        if (isOllama) {
+            const response = await fetch("http://localhost:11434/api/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: ollamaTargetModel,
+                    messages: messages,
+                    options: { temperature: 0.1 },
+                    stream: true
+                })
+            });
+            if (!response.ok) throw new Error("Ollama connection failed");
+            
+            async function* iterOllama(res) {
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    const text = decoder.decode(value, { stream: true });
+                    for (const line of text.split("\n")) {
+                        if (!line.trim()) continue;
+                        try {
+                            const data = JSON.parse(line);
+                            if (data.message?.content) yield { choices: [{ delta: { content: data.message.content } }] };
+                        } catch(e) {}
+                    }
+                }
+            }
+            chunks = iterOllama(response);
+        } else {
+            chunks = await engine.chat.completions.create({ 
+                messages, 
+                stream: true,
+                temperature: 0.1, 
+                max_tokens: 600
+            });
+        }
 
         const realtimeDisplay = document.getElementById('realtimeAiDisplay');
         const placeholder = document.getElementById('realtimePlaceholder');
