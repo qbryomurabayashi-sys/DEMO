@@ -856,7 +856,7 @@ async function startSplashAndInit() {
                 appConfig: myAppConfig,
                 initProgressCallback,
                 chatOpts: {
-                    context_window_size: 4096 // Increased from 2048 for better accuracy
+                    context_window_size: 2048 // Reduced from 4096 to prevent memory crashes
                 }
             });
             engine.activeModel = modelName;
@@ -1294,7 +1294,7 @@ async function generateSummary() {
                 engine = await CreateMLCEngine(modelName, { 
                     appConfig: myAppConfig,
                     initProgressCallback: initProgressCallback,
-                    chatOpts: { context_window_size: 4096 }
+                    chatOpts: { context_window_size: 2048 }
                 });
                 engine.activeModel = modelName;
             }
@@ -1493,7 +1493,7 @@ async function processRealtimeAI() {
             engine = await CreateMLCEngine(modelName, { 
                 appConfig: myAppConfig,
                 initProgressCallback: initProgressCallback,
-                chatOpts: { context_window_size: 4096 }
+                chatOpts: { context_window_size: 2048 }
             });
             engine.activeModel = modelName;
         }
