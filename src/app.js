@@ -1467,8 +1467,8 @@ async function processRealtimeAI() {
         ollamaTargetModel = modelName.split(':')[2] === 'e2b' ? 'gemma4:e2b' : 'gemma4:e4b';
     }
 
-    // Increase buffer requirement to 100 chars for overall context
-    if ((!engine && !isOllama) || isRealtimeProcessing || realtimeAiBuffer.length < 100) return;
+    // Stop if already processing or insufficient buffer
+    if (isRealtimeProcessing || realtimeAiBuffer.length < 50) return;
     
     const isRealtimeEnabled = document.getElementById('realtimeAiToggle');
     if (isRealtimeEnabled && !isRealtimeEnabled.checked) {
@@ -1480,6 +1480,40 @@ async function processRealtimeAI() {
     realtimeAiBuffer = ''; // Reset accumulation buffer
     
     try {
+        const realtimeDisplay = document.getElementById('realtimeAiDisplay');
+        const placeholder = document.getElementById('realtimePlaceholder');
+        
+        if (!isOllama && (!engine || engine.activeModel !== modelName)) {
+            // Need to initialize engine
+            if (placeholder) {
+                placeholder.classList.add('hidden');
+            }
+            realtimeDisplay.classList.remove('hidden');
+            realtimeDisplay.innerHTML = `<div class="text-emerald-400/70 p-4 border border-emerald-900/30 rounded-lg text-sm flex items-center justify-center gap-3"><i data-lucide="loader" class="w-4 h-4 animate-spin"></i> AIモデルを初期化中... (初回は数分かかります)</div>`;
+            if (window.lucide) window.lucide.createIcons();
+
+            if (engine) {
+                try { await engine.unload(); } catch (e) {}
+            }
+
+            await loadAiLibraries();
+            const myAppConfig = await getAppConfig();
+            
+            // Dummy callback for background loading
+            const initProgressCallback = (initProgress) => {
+                const percent = Math.round(initProgress.progress * 100);
+                realtimeDisplay.innerHTML = `<div class="text-emerald-400/70 p-4 border border-emerald-900/30 rounded-lg text-sm flex items-center justify-center gap-3"><i data-lucide="loader" class="w-4 h-4 animate-spin"></i> AIモデルをロード中... ${percent}%</div>`;
+                if (window.lucide) window.lucide.createIcons();
+            };
+
+            engine = await CreateMLCEngine(modelName, { 
+                appConfig: myAppConfig,
+                initProgressCallback: initProgressCallback,
+                chatOpts: { context_window_size: 4096 }
+            });
+            engine.activeModel = modelName;
+        }
+
         // Extract all manual memos for high priority context
         const manualMemos = (finalTranscript.match(/\[.*?\] 【重要メモ】.*?\n/g) || []).join('\n');
         // Take last 2000 characters of transcription for context window
@@ -1544,8 +1578,6 @@ ${manualMemos || "（特になし）"}
             });
         }
 
-        const realtimeDisplay = document.getElementById('realtimeAiDisplay');
-        const placeholder = document.getElementById('realtimePlaceholder');
         if (placeholder) placeholder.classList.add('hidden');
         realtimeDisplay.classList.remove('hidden');
 
