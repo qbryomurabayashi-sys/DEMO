@@ -269,8 +269,8 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (savedModel && Array.from(modelSelect.options).some(opt => opt.value === savedModel)) {
             modelSelect.value = savedModel;
         } else {
-            // Default to Gemma 2 2B for v2.1+
-            modelSelect.value = 'gemma-2-2b-it-q4f16_1-MLC';
+            // Default to Llama 3.2 3B for v2.1+
+            modelSelect.value = 'Llama-3.2-3B-Instruct-q4f16_1-MLC';
             localStorage.setItem('webllm_model', modelSelect.value);
         }
         
@@ -451,7 +451,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     // Prevent accidental close
     window.addEventListener('beforeunload', (e) => {
-        if (isRecording || isProcessingAI) {
+        if (isRecording || isProcessingAI || finalTranscript.trim().length > 0) {
             e.preventDefault();
             e.returnValue = '';
         }
@@ -1245,7 +1245,7 @@ async function generateSummary() {
         return;
     }
 
-    const modelName = document.getElementById('modelNameInput').value || 'gemma-2-2b-it-q4f16_1-MLC';
+    const modelName = document.getElementById('modelNameInput').value || 'Llama-3.2-3B-Instruct-q4f16_1-MLC';
     const selectedTasks = Array.from(document.querySelectorAll('input[name="aiTask"]:checked')).map(cb => cb.value);
     
     if (selectedTasks.length === 0) {
@@ -1418,6 +1418,10 @@ ${finalTranscript}`;
                 });
             }
 
+            if (!chunks) {
+                throw new Error("AI処理に失敗しました。ローカルモデルが破損している可能性があります。");
+            }
+
             let reply = "";
             for await (const chunk of chunks) {
                 const content = chunk.choices[0]?.delta?.content || "";
@@ -1444,7 +1448,7 @@ ${finalTranscript}`;
 }
 
 async function processRealtimeAI() {
-    const modelName = document.getElementById('modelNameInput')?.value || 'gemma-2-2b-it-q4f16_1-MLC';
+    const modelName = document.getElementById('modelNameInput')?.value || 'Llama-3.2-3B-Instruct-q4f16_1-MLC';
     const isOllama = modelName.startsWith('OLLAMA:');
     let ollamaTargetModel = 'gemma4:e4b';
     if (isOllama) {
@@ -1452,7 +1456,7 @@ async function processRealtimeAI() {
     }
 
     // Stop if already processing or insufficient buffer
-    if (isRealtimeProcessing || realtimeAiBuffer.trim().length < 10) return;
+    if (isProcessingAI || isRealtimeProcessing || realtimeAiBuffer.trim().length < 10) return;
     
     const isRealtimeEnabled = document.getElementById('realtimeAiToggle');
     if (isRealtimeEnabled && !isRealtimeEnabled.checked) {
@@ -1500,8 +1504,8 @@ async function processRealtimeAI() {
 
         // Extract all manual memos for high priority context
         const manualMemos = (finalTranscript.match(/\[.*?\] 【重要メモ】.*?\n/g) || []).join('\n');
-        // Take last 2000 characters of transcription for context window
-        const recentTranscript = finalTranscript.slice(-2000);
+        // Take last 800 characters of transcription for context window to avoid WebGPU VRAM crash
+        const recentTranscript = finalTranscript.slice(-800);
 
         const prompt = `あなたはプロの会議要約アシスタントです。
 これまでの会議の流れをリアルタイムで追跡し、現在の「全体要約」を最新の状態に更新してください。
@@ -1595,6 +1599,10 @@ ${manualMemos || "（特になし）"}
         
         const contentDiv = summaryContainer.querySelector('.content');
 
+        if (!chunks) {
+            throw new Error("Invalid response from engine");
+        }
+
         let reply = "";
         for await (const chunk of chunks) {
             const content = chunk.choices[0]?.delta?.content || "";
@@ -1606,6 +1614,10 @@ ${manualMemos || "（特になし）"}
         }
     } catch (e) {
         console.warn("Real-time AI Error:", e);
+        if (e.message && (e.message.includes('disposed') || e.message.includes('external Instance') || e.message.includes('Device was lost') || e.message.includes('dropped'))) {
+            // WebGPU device crashed, force reload next time
+            engine = null;
+        }
         const realtimeDisplay = document.getElementById('realtimeAiDisplay');
         if (realtimeDisplay) {
             if (isOllama) {
