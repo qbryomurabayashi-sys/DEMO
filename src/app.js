@@ -453,7 +453,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     window.addEventListener('beforeunload', (e) => {
         if (isRecording || isProcessingAI || finalTranscript.trim().length > 0) {
             e.preventDefault();
-            e.returnValue = '';
+            const msg = '変更が保存されていない可能性があります。ページを離れますか？';
+            e.returnValue = msg;
+            return msg;
         }
     });
 
@@ -983,7 +985,7 @@ function initApp() {
                     const isRealtimeEnabled = document.getElementById('realtimeAiToggle')?.checked;
                     if (isRealtimeEnabled) {
                         realtimeAiBuffer += text + ' ';
-                        processRealtimeAI();
+                        // Real-time AI will now be triggered periodically via timer or manually
                     }
                 } else {
                     interim += res[0].transcript;
@@ -1173,6 +1175,14 @@ async function toggleRecording() {
                 const t = Math.floor((Date.now() - startTime) / 1000);
                 const h = String(Math.floor(t / 3600)).padStart(2, '0'), m = String(Math.floor((t % 3600) / 60)).padStart(2, '0'), s = String(t % 60).padStart(2, '0');
                 document.getElementById('timerDisplay').innerText = `${h}:${m}:${s}`;
+                
+                // Trigger real-time AI every 5 minutes (300 seconds)
+                if (t > 0 && t % 300 === 0) {
+                    const isRealtimeEnabled = document.getElementById('realtimeAiToggle')?.checked;
+                    if (isRealtimeEnabled && !isRealtimeProcessing) {
+                        processRealtimeAI();
+                    }
+                }
             }, 1000);
         } catch (err) { showError(`ERR [${err.name}]: マイク起動失敗。`); }
     }
@@ -1635,10 +1645,6 @@ ${manualMemos || "（特になし）"}
         }
     } finally {
         isRealtimeProcessing = false;
-        // If more text accumulated while processing, trigger again
-        if (realtimeAiBuffer.trim().length > 0) {
-            setTimeout(processRealtimeAI, 1000);
-        }
     }
 }
 
