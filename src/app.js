@@ -936,10 +936,10 @@ function initApp() {
     setupMobileTabs();
     
     // Auto populate mic list if permissions were already granted
-    navigator.mediaDevices.enumerateDevices().then(devices => {
-        let hasLabels = devices.some(d => d.label);
-        updateMicList(hasLabels);
-    }).catch(()=>{});
+    if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+        // Just populate with whatever we currently have permissions for
+        updateMicList(false);
+    }
 
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1038,7 +1038,9 @@ function initApp() {
 async function updateMicList(requestPermission = false) {
     try {
         if (requestPermission) {
-            await navigator.mediaDevices.getUserMedia({ audio: true });
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            // Close the stream immediately if we only wanted permission
+            stream.getTracks().forEach(track => track.stop());
         }
         const devices = await navigator.mediaDevices.enumerateDevices();
         const audioInputs = devices.filter(device => device.kind === 'audioinput');
