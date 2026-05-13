@@ -323,7 +323,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     // Buttons
     document.getElementById('recBtn').addEventListener('click', toggleRecording);
-    document.getElementById('refreshMicBtn').addEventListener('click', updateMicList);
+    document.getElementById('refreshMicBtn').addEventListener('click', () => updateMicList(true));
     document.getElementById('downloadAudioBtn').addEventListener('click', () => {
         let ext = '.webm';
         if (currentAudioBlob) {
@@ -935,6 +935,12 @@ async function startSplashAndInit() {
 function initApp() {
     setupMobileTabs();
     
+    // Auto populate mic list if permissions were already granted
+    navigator.mediaDevices.enumerateDevices().then(devices => {
+        let hasLabels = devices.some(d => d.label);
+        updateMicList(hasLabels);
+    }).catch(()=>{});
+
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -1029,12 +1035,15 @@ function initApp() {
     }
 }
 
-async function updateMicList() {
+async function updateMicList(requestPermission = false) {
     try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (requestPermission) {
+            await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
         const devices = await navigator.mediaDevices.enumerateDevices();
         const audioInputs = devices.filter(device => device.kind === 'audioinput');
         const select = document.getElementById('micSelect');
+        const previousValue = select.value;
         select.innerHTML = '<option value="">システム標準マイク</option>';
         audioInputs.forEach(device => {
             if (device.deviceId !== 'default' && device.deviceId !== 'communications') {
@@ -1044,6 +1053,7 @@ async function updateMicList() {
                 select.appendChild(option);
             }
         });
+        if (previousValue) select.value = previousValue;
     } catch (err) { console.warn("マイク一覧取得失敗:", err); }
 }
 
