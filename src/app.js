@@ -35,39 +35,13 @@ async function loadMermaid() {
 
 const APP_VERSION = "2.1.1";
 
-// Define custom models (Gemma 4 E4B/E2B)
-const customModelList = [
-    {
-        model_id: "gemma-4-e4b-it-q4f16_1-MLC",
-        model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/gemma-2-2b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm",
-        vram_required_MB: 1895.3,
-        low_resource_required: false,
-        required_features: ["shader-f16"],
-        model: "https://huggingface.co/mlc-ai/gemma-2-2b-it-q4f16_1-MLC"
-    },
-    {
-        model_id: "gemma-4-E2B-it-q4f16_1-MLC",
-        model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/gemma-2-2b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm",
-        vram_required_MB: 1583.3,
-        low_resource_required: true,
-        required_features: ["shader-f16"],
-        model: "https://huggingface.co/welcoma/gemma-4-E2B-it-q4f16_1-MLC"
-    },
-    {
-        model_id: "gemma-3-9b-it-q4f16_1-MLC",
-        model_lib: "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_80/gemma-2-9b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm",
-        vram_required_MB: 5000,
-        low_resource_required: false,
-        required_features: ["shader-f16"],
-        model: "https://huggingface.co/mlc-ai/gemma-2-9b-it-q4f16_1-MLC"
-    }
-];
+// Removed unused customModelList
 
 // Config getter
 async function getAppConfig() {
     await loadAiLibraries();
     return {
-        model_list: [...prebuiltAppConfig.model_list, ...customModelList]
+        model_list: prebuiltAppConfig.model_list
     };
 }
 
@@ -1407,11 +1381,13 @@ ${finalTranscript}`;
                 async function* iterOllama(res) {
                     const reader = res.body.getReader();
                     const decoder = new TextDecoder();
+                    let buffer = "";
                     while (true) {
                         const { value, done } = await reader.read();
                         if (done) break;
-                        const text = decoder.decode(value, { stream: true });
-                        const lines = text.split("\n");
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split("\n");
+                        buffer = lines.pop();
                         for (const line of lines) {
                             if (!line.trim()) continue;
                             try {
@@ -1421,6 +1397,14 @@ ${finalTranscript}`;
                                 }
                             } catch(e) {}
                         }
+                    }
+                    if (buffer.trim()) {
+                        try {
+                            const data = JSON.parse(buffer);
+                            if (data.message && data.message.content) {
+                                yield { choices: [{ delta: { content: data.message.content } }] };
+                            }
+                        } catch(e) {}
                     }
                 }
                 chunks = iterOllama(response);
@@ -1555,17 +1539,26 @@ ${manualMemos || "（特になし）"}
             async function* iterOllama(res) {
                 const reader = res.body.getReader();
                 const decoder = new TextDecoder();
+                let buffer = "";
                 while (true) {
                     const { value, done } = await reader.read();
                     if (done) break;
-                    const text = decoder.decode(value, { stream: true });
-                    for (const line of text.split("\n")) {
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n");
+                    buffer = lines.pop();
+                    for (const line of lines) {
                         if (!line.trim()) continue;
                         try {
                             const data = JSON.parse(line);
                             if (data.message?.content) yield { choices: [{ delta: { content: data.message.content } }] };
                         } catch(e) {}
                     }
+                }
+                if (buffer.trim()) {
+                    try {
+                        const data = JSON.parse(buffer);
+                        if (data.message?.content) yield { choices: [{ delta: { content: data.message.content } }] };
+                    } catch(e) {}
                 }
             }
             chunks = iterOllama(response);
@@ -1613,6 +1606,14 @@ ${manualMemos || "（特になし）"}
         }
     } catch (e) {
         console.warn("Real-time AI Error:", e);
+        const realtimeDisplay = document.getElementById('realtimeAiDisplay');
+        if (realtimeDisplay && isOllama) {
+            realtimeDisplay.innerHTML = `<div class="text-red-400/80 p-4 border border-red-900/30 rounded-lg text-sm flex items-center justify-center gap-3">
+                <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                Ollamaとの通信に失敗しました。ローカルサーバーが起動しているか確認してください。
+            </div>`;
+            if (window.lucide) window.lucide.createIcons();
+        }
     } finally {
         isRealtimeProcessing = false;
         // If more text accumulated, check again later

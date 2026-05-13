@@ -324,18 +324,14 @@
             <select id="modelNameInput" class="w-full bg-slate-900 border border-slate-600 rounded-md px-4 py-2.5 text-sm text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition font-mono">
               <optgroup label="Gemma シリーズ (WebLLM)">
                 <option value="gemma-2-2b-it-q4f16_1-MLC" selected>✨ Gemma 2 2B (軽量・安定)</option>
-                <option value="gemma-2-9b-it-q4f16_1-MLC">🧠 Gemma 2 9B (高精度)</option>
+                <option value="gemma-2-9b-it-q4f16_1-MLC">🧠 Gemma 2 9B (超高精度)</option>
               </optgroup>
               <optgroup label="Llama シリーズ (WebLLM)">
                 <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">🎙️ Llama 3.2 3B (標準・高機能)</option>
                 <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">⚡ Llama 3.2 1B (高速・超軽量)</option>
               </optgroup>
-              <optgroup label="ローカル Ollama 連携 (Python/Ollama版)">
-                <option value="OLLAMA:gemma4:e4b">🚀 Gemma 4 E4B (Ollama ローカル)</option>
-                <option value="OLLAMA:gemma4:e2b">🚀 Gemma 4 E2B (Ollama ローカル)</option>
-              </optgroup>
             </select>
-            <p class="text-xs text-slate-500 mt-1.5">※初回実行時にブラウザのキャッシュにモデルがダウンロードされます。</p>
+            <p class="text-[10px] text-slate-400 mt-1.5">すべてのモデルはブラウザ内で動作します（外部通信なし）。</p>
           </div>
           <div id="modelChangeWarning" class="hidden bg-amber-900/20 border border-amber-700/30 rounded-md p-4 text-xs text-amber-200 leading-relaxed">
             <strong class="flex items-center gap-1 mb-1 text-amber-400 font-bold"><i data-lucide="alert-circle" class="w-4 h-4"></i> モデル変更の注意</strong>
@@ -380,19 +376,8 @@
           <div class="space-y-3 mb-8 text-left">
             <span class="text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-2 block">推奨モデルを選択してください</span>
             
-            <label class="flex items-center gap-4 p-4 bg-slate-800/50 rounded-xl border-2 border-slate-700 cursor-pointer hover:border-blue-500 transition group has-[:checked]:border-blue-600 has-[:checked]:bg-blue-900/10">
-              <input type="radio" name="setupModel" value="gemma-4-e4b-it-q4f16_1-MLC" checked class="w-5 h-5 text-blue-600 focus:ring-blue-500 bg-slate-800 border-slate-700">
-              <div class="flex-1">
-                <div class="flex items-center gap-2">
-                  <span class="font-bold text-slate-100 italic">GEMMA 4 4B (最強推奨)</span>
-                  <span class="bg-blue-600 text-[9px] px-1.5 py-0.5 rounded-sm font-bold uppercase text-white">PREMIER</span>
-                </div>
-                <p class="text-[10px] text-slate-400">最高の精度を持つモデル (WebGPU)</p>
-              </div>
-            </label>
-
             <label class="flex items-center gap-4 p-4 bg-slate-800/50 rounded-xl border-2 border-slate-700 cursor-pointer hover:border-emerald-500 transition group has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-900/10">
-              <input type="radio" name="setupModel" value="gemma-2-2b-it-q4f16_1-MLC" class="w-5 h-5 text-emerald-600 focus:ring-emerald-500 bg-slate-800 border-slate-700">
+              <input type="radio" name="setupModel" value="gemma-2-2b-it-q4f16_1-MLC" checked class="w-5 h-5 text-emerald-600 focus:ring-emerald-500 bg-slate-800 border-slate-700">
               <div class="flex-1">
                 <div class="flex items-center gap-2">
                   <span class="font-bold text-slate-100 italic">GEMMA 2 2B (軽量推奨)</span>
@@ -403,15 +388,7 @@
             </label>
 
             <label class="flex items-center gap-4 p-4 bg-slate-800/50 rounded-xl border-2 border-slate-700 cursor-pointer hover:border-blue-300 transition group has-[:checked]:border-blue-400 has-[:checked]:bg-blue-900/10">
-              <input type="radio" name="setupModel" value="OLLAMA:gemma4:e4b" class="w-5 h-5 text-blue-400 focus:ring-blue-400 bg-slate-800 border-slate-700">
-              <div class="flex-1">
-                <span class="font-bold text-slate-100">Gemma 4 E4B (Ollama)</span>
-                <p class="text-[10px] text-slate-400">バックグラウンドのOllama(gemma4:e4b)を利用</p>
-              </div>
-            </label>
-
-            <label class="flex items-center gap-4 p-4 bg-slate-800/50 rounded-xl border-2 border-slate-700 cursor-pointer hover:border-slate-500 transition group has-[:checked]:border-slate-400 has-[:checked]:bg-slate-700/20">
-              <input type="radio" name="setupModel" value="Llama-3.2-3B-Instruct-q4f16_1-MLC" class="w-5 h-5 text-slate-300 focus:ring-slate-500 bg-slate-800 border-slate-700">
+              <input type="radio" name="setupModel" value="Llama-3.2-3B-Instruct-q4f16_1-MLC" class="w-5 h-5 text-blue-400 focus:ring-blue-400 bg-slate-800 border-slate-700">
               <div class="flex-1">
                 <span class="font-bold text-slate-100">Llama 3.2 3B (高機能)</span>
                 <p class="text-[10px] text-slate-400">少し重めの高精度な標準モデル</p>
