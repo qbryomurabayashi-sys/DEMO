@@ -1452,7 +1452,7 @@ async function processRealtimeAI() {
     }
 
     // Stop if already processing or insufficient buffer
-    if (isRealtimeProcessing || realtimeAiBuffer.length < 50) return;
+    if (isRealtimeProcessing || realtimeAiBuffer.trim().length < 10) return;
     
     const isRealtimeEnabled = document.getElementById('realtimeAiToggle');
     if (isRealtimeEnabled && !isRealtimeEnabled.checked) {
@@ -1607,16 +1607,26 @@ ${manualMemos || "（特になし）"}
     } catch (e) {
         console.warn("Real-time AI Error:", e);
         const realtimeDisplay = document.getElementById('realtimeAiDisplay');
-        if (realtimeDisplay && isOllama) {
-            realtimeDisplay.innerHTML = `<div class="text-red-400/80 p-4 border border-red-900/30 rounded-lg text-sm flex items-center justify-center gap-3">
-                <i data-lucide="alert-circle" class="w-4 h-4"></i>
-                Ollamaとの通信に失敗しました。ローカルサーバーが起動しているか確認してください。
-            </div>`;
+        if (realtimeDisplay) {
+            if (isOllama) {
+                realtimeDisplay.innerHTML = `<div class="text-red-400/80 p-4 border border-red-900/30 rounded-lg text-sm flex items-center justify-center gap-3">
+                    <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                    Ollamaとの通信に失敗しました。ローカルサーバーが起動しているか確認してください。
+                </div>`;
+            } else {
+                realtimeDisplay.innerHTML = `<div class="text-red-400/80 p-4 border border-red-900/30 rounded-lg text-sm flex items-center justify-center gap-3">
+                    <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                    モデル初期化エラー: ${e.message}
+                </div>`;
+            }
             if (window.lucide) window.lucide.createIcons();
         }
     } finally {
         isRealtimeProcessing = false;
-        // If more text accumulated, check again later
+        // If more text accumulated while processing, trigger again
+        if (realtimeAiBuffer.trim().length > 0) {
+            setTimeout(processRealtimeAI, 1000);
+        }
     }
 }
 
