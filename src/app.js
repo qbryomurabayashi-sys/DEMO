@@ -262,14 +262,19 @@ window.addEventListener('DOMContentLoaded', async () => {
     const sttSelect = document.getElementById('sttEngineSelect');
     if (sttSelect) sttSelect.value = currentStt;
 
-    if (currentStt === 'whisper-tiny') {
+    if (currentStt.startsWith('whisper-')) {
         whisperActive = true;
         try {
-            document.getElementById('setupModalMessage').innerText = "完全オフラインモード(Whisper)の初期化中...\n※初回はモデルのダウンロードに時間がかかります";
+            document.getElementById('setupModalMessage').innerText = "完全オフラインモード(Whisper)の初期化中...\n※初回はモデルのダウンロードに数分時間がかかります";
             const loadingInd = document.getElementById('loadingIndicator');
             loadingInd.classList.remove('hidden');
             const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3');
-            whisperTranscriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
+            
+            let modelId = 'Xenova/whisper-tiny';
+            if (currentStt === 'whisper-base') modelId = 'Xenova/whisper-base';
+            else if (currentStt === 'whisper-small') modelId = 'Xenova/whisper-small';
+
+            whisperTranscriber = await pipeline('automatic-speech-recognition', modelId, {
                 device: navigator.gpu ? 'webgpu' : 'wasm'
             });
             loadingInd.classList.add('hidden');
@@ -862,19 +867,26 @@ async function startSplashAndInit() {
         
         localStorage.setItem(crashKey, (loadCount + 1).toString());
 
-        // Dynamic Loading
-        await loadAiLibraries();
-        const myAppConfig = await getAppConfig();
+        let isOllama = modelName.startsWith('OLLAMA:');
+        if (isOllama) {
+            splashProgressBar.style.width = `100%`;
+            splashPercentText.innerText = `100%`;
+            splashStatusText.innerText = "Ollama (Local) モードで起動しました";
+        } else {
+            // Dynamic Loading
+            await loadAiLibraries();
+            const myAppConfig = await getAppConfig();
 
-        // Initialize engine with expanded context window for better coherence
-        engine = await CreateMLCEngine(modelName, { 
-            appConfig: myAppConfig,
-            initProgressCallback,
-            chatOpts: {
-                context_window_size: 4096 // Increased from 2048 for better accuracy
-            }
-        });
-        engine.activeModel = modelName;
+            // Initialize engine with expanded context window for better coherence
+            engine = await CreateMLCEngine(modelName, { 
+                appConfig: myAppConfig,
+                initProgressCallback,
+                chatOpts: {
+                    context_window_size: 4096 // Increased from 2048 for better accuracy
+                }
+            });
+            engine.activeModel = modelName;
+        }
         
         // Update header display
         const modelSelect = document.getElementById('modelNameInput');
