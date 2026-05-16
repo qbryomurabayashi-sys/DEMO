@@ -1225,16 +1225,22 @@ async function runWhisperTranscription(blob) {
     }
 }
 
+let lastFinalTranscript = null;
+let cachedHighlighted = "";
+
 function updateTranscriptionUI() {
     const fullText = finalTranscript;
     
-    // Highlight manual/important memos with bold and color
-    const escapedText = fullText.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[m]));
-    const highlighted = escapedText.replace(/\[\d{2}:\d{2}(?::\d{2})?\] 【重要メモ】.*$/gm, (match) => {
-        return `<span class="memo-highlight block my-1.5 p-3 rounded-lg border-2 border-amber-500/40 bg-amber-500/10 font-bold shadow-sm shadow-amber-900/20">${match}</span>`;
-    });
-
-    document.getElementById('transcriptionDisplay').innerHTML = highlighted;
+    if (fullText !== lastFinalTranscript) {
+        lastFinalTranscript = fullText;
+        // Highlight manual/important memos with bold and color
+        const escapedText = fullText.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[m]));
+        cachedHighlighted = escapedText.replace(/\[\d{2}:\d{2}(?::\d{2})?\] 【重要メモ】.*$/gm, (match) => {
+            return `<span class="memo-highlight block my-1.5 p-3 rounded-lg border-2 border-amber-500/40 bg-amber-500/10 font-bold shadow-sm shadow-amber-900/20">${match}</span>`;
+        });
+        document.getElementById('transcriptionDisplay').innerHTML = cachedHighlighted;
+    }
+    
     document.getElementById('interimDisplay').innerText = interimTranscript;
     
     if (fullText || interimTranscript) {
