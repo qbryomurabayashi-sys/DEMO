@@ -1,6 +1,6 @@
 {
   "name": "ローカル音声メモ",
   "description": "純粋な録音機能と文字起こし、セッション保存を提供するアプリ",
-  "requestFramePermissions": ["microphone"],
+  "requestFramePermissions": ["microphone", "speech-recognition"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

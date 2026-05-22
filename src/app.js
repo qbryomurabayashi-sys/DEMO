@@ -73,6 +73,8 @@ function initSpeechRecognition() {
     rec.onstart = () => {
         const errDisp = document.getElementById('sysErrorArea');
         if (errDisp) errDisp.classList.add('hidden');
+        interimTranscript = "(音声認識が起動しました...)";
+        updateTranscriptionUI();
     };
 
     rec.onresult = (event) => {
@@ -111,6 +113,8 @@ function initSpeechRecognition() {
     rec.onend = () => {
         // Critical for transcription accuracy: keep restarting as long as we are meant to be recording!
         if (isRecording) {
+            interimTranscript = "(認識リセット中...)";
+            updateTranscriptionUI();
             try {
                 rec.start();
             } catch (e) {
@@ -143,7 +147,25 @@ function updateTranscriptionUI() {
         const container = document.getElementById('viewTranscription');
         container.scrollTop = container.scrollHeight;
     } else {
-        placeholder.style.display = 'flex';
+        if (isRecording) {
+            placeholder.innerHTML = `
+              <i data-lucide="mic" class="w-12 h-12 mb-4 text-blue-500 animate-pulse"></i>
+              <p class="text-sm font-bold uppercase tracking-widest mb-1 text-blue-400">録音中...</p>
+              <p class="text-[10px] text-slate-400">音声を検出しています。しばらく声を出してみてください。</p>
+            `;
+            placeholder.style.display = 'flex';
+            placeholder.classList.remove('opacity-40');
+            lucide.createIcons();
+        } else {
+            placeholder.innerHTML = `
+              <i data-lucide="activity" class="w-12 h-12 mb-4"></i>
+              <p class="text-sm font-bold uppercase tracking-widest mb-1">録音準備完了</p>
+              <p class="text-[10px]">上のボタンから録音を開始してください</p>
+            `;
+            placeholder.style.display = 'flex';
+            placeholder.classList.add('opacity-40');
+            lucide.createIcons();
+        }
         display.innerHTML = '';
         interimDisp.innerText = '';
     }
@@ -224,11 +246,12 @@ async function toggleRecording() {
         };
 
         try {
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            
-            // Re-init recognition cleanly
+            // Re-init recognition cleanly BEFORE await for Safari compatibility
             recognition = initSpeechRecognition();
             if(!recognition) return;
+            recognition.start();
+            
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
             
             hideError();
             
@@ -253,7 +276,6 @@ async function toggleRecording() {
             };
             
             mediaRecorder.start(1000);
-            recognition.start();
             isRecording = true;
             await requestWakeLock();
             
