@@ -70,14 +70,38 @@ function initSpeechRecognition() {
     rec.lang = 'ja-JP';
     rec.maxAlternatives = 1;
 
+    let speechStallTimeout = null;
+
+    function resetStallTimeout() {
+        if (speechStallTimeout) clearTimeout(speechStallTimeout);
+        speechStallTimeout = setTimeout(() => {
+            if (isRecording && rec) {
+                console.log("Speech recognition appears stalled. Forcing restart...");
+                try { rec.stop(); } catch(e){}
+            }
+        }, 15000); // 15 seconds of absolute silence triggers a restart
+    }
+
     rec.onstart = () => {
+        console.log("Speech recognition started");
         const errDisp = document.getElementById('sysErrorArea');
         if (errDisp) errDisp.classList.add('hidden');
-        interimTranscript = "(音声認識が起動しました...)";
+        interimTranscript = "(音声を聞き取っています...)";
         updateTranscriptionUI();
+        resetStallTimeout();
     };
 
+    rec.onaudiostart = () => console.log('Audio capturing started');
+    rec.onsoundstart = () => console.log('Sound started');
+    rec.onspeechstart = () => console.log('Speech started');
+    rec.onspeechend = () => console.log('Speech ended');
+    rec.onsoundend = () => { console.log('Sound ended'); resetStallTimeout(); };
+    rec.onaudioend = () => console.log('Audio capturing ended');
+    rec.onnomatch = () => console.log('No match');
+
     rec.onresult = (event) => {
+        resetStallTimeout();
+        console.log("Speech recognition result received", event.results);
         let interim = '';
         const currentTimeParts = getFormattedTime(Date.now() - startTime);
 
@@ -136,9 +160,11 @@ function updateTranscriptionUI() {
         placeholder.style.display = 'none';
         
         let escapedText = finalTranscript.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[m]));
-        const highlighted = escapedText.replace(/\[\d{2}:\d{2}(?::\d{2})?\] 【重要メモ】.*$/gm, (match) => {
-            return `<span class="memo-highlight block my-1.5 p-3 rounded-lg border-2 border-amber-500/40 bg-amber-500/10 font-bold shadow-sm shadow-amber-900/20 text-amber-100">${match}</span>`;
-        });
+        const highlighted = escapedText
+            .replace(/\[\d{2}:\d{2}(?::\d{2})?\] 【重要メモ】.*$/gm, (match) => {
+                return `<span class="memo-highlight block my-1.5 p-3 rounded-lg border-2 border-amber-500/40 bg-amber-500/10 font-bold shadow-sm shadow-amber-900/20 text-amber-100">${match}</span>`;
+            })
+            .replace(/\n/g, '<br>');
 
         display.innerHTML = highlighted;
         interimDisp.innerText = interimTranscript;
@@ -246,12 +272,17 @@ async function toggleRecording() {
         };
 
         try {
-            // Re-init recognition cleanly BEFORE await for Safari compatibility
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+            // Re-init recognition cleanly
             recognition = initSpeechRecognition();
             if(!recognition) return;
-            recognition.start();
             
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            try {
+                recognition.start();
+            } catch(e) {
+                console.error("Failed to start recognition:", e);
+            }
             
             hideError();
             
@@ -317,10 +348,10 @@ function stopRecording() {
         try { recognition.stop(); } catch(e){}
     }
     
-    if (interimTranscript) {
+    if (interimTranscript && !interimTranscript.startsWith('(')) {
         finalTranscript += `\n[${document.getElementById('timerDisplay').innerText}] ${interimTranscript}\n`;
-        interimTranscript = '';
     }
+    interimTranscript = '';
     
     updateTranscriptionUI();
     
