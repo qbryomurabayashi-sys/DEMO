@@ -126,12 +126,20 @@ function initSpeechRecognition() {
         const errText = document.getElementById('sysErrorText');
         if (errDisp && errText) {
             errDisp.classList.remove('hidden');
-            errText.innerText = "音声認識エラー: " + event.error;
+            if (event.error === 'not-allowed') {
+                const isIframe = window.self !== window.top;
+                if (isIframe) {
+                    errText.innerHTML = '<strong>【重要】マイクへのアクセス拒否について</strong><br>現在はプレビュー画面で実行されているため、ブラウザのセキュリティ制限によりマイクがブロックされています。<br><strong>右上の「新しいタブで開く」アイコンから起動し直してください。</strong>';
+                } else {
+                    errText.innerText = "マイクへのアクセスが拒否されました。ブラウザの設定でマイクを「許可」してリロードしてください。";
+                }
+            } else if (event.error === 'network') {
+                errText.innerText = "ネットワークエラーのため文字起こしが停止しました。";
+            } else {
+                errText.innerText = "音声認識エラー: " + event.error;
+            }
         }
-        if (event.error === 'not-allowed') {
-            alert("マイクへのアクセスが拒否されました。");
-            stopRecording();
-        }
+        stopRecording();
     };
 
     rec.onend = () => {
@@ -156,7 +164,7 @@ function updateTranscriptionUI() {
     const placeholder = document.getElementById('transcriptionPlaceholder');
     const interimDisp = document.getElementById('interimDisplay');
     
-    if (finalTranscript || interimTranscript) {
+    if (finalTranscript || interimTranscript && !interimTranscript.startsWith('(')) {
         placeholder.style.display = 'none';
         
         let escapedText = finalTranscript.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[m]));
@@ -173,27 +181,29 @@ function updateTranscriptionUI() {
         const container = document.getElementById('viewTranscription');
         container.scrollTop = container.scrollHeight;
     } else {
+        const isIframe = window.self !== window.top;
         if (isRecording) {
             placeholder.innerHTML = `
               <i data-lucide="mic" class="w-12 h-12 mb-4 text-blue-500 animate-pulse"></i>
               <p class="text-sm font-bold uppercase tracking-widest mb-1 text-blue-400">録音中...</p>
-              <p class="text-[10px] text-slate-400">音声を検出しています。しばらく声を出してみてください。</p>
+              ${isIframe ? '<p class="text-xs text-amber-400 font-bold mt-2 bg-amber-900/30 p-2 rounded">【重要】プレビュー画面ではブラウザの制限で文字起こしが出ない場合があります。<br>右上の「新しいタブで開く」アイコンから起動してください。</p>' : '<p class="text-[10px] text-slate-400 mt-2">音声を検出しています。しばらく声を出してみてください。</p>'}
             `;
             placeholder.style.display = 'flex';
             placeholder.classList.remove('opacity-40');
             lucide.createIcons();
+            
+            interimDisp.innerText = interimTranscript; // Show the waiting message
         } else {
             placeholder.innerHTML = `
               <i data-lucide="activity" class="w-12 h-12 mb-4"></i>
               <p class="text-sm font-bold uppercase tracking-widest mb-1">録音準備完了</p>
-              <p class="text-[10px]">上のボタンから録音を開始してください</p>
+              ${isIframe ? '<p class="text-xs text-amber-400 mt-2">※右上のアイコンから別タブで開くと文字起こしが安定します</p>' : '<p class="text-[10px] mt-2">上のボタンから録音を開始してください</p>'}
             `;
             placeholder.style.display = 'flex';
             placeholder.classList.add('opacity-40');
             lucide.createIcons();
         }
         display.innerHTML = '';
-        interimDisp.innerText = '';
     }
     
     document.getElementById('downloadTransBtn').disabled = !finalTranscript;
@@ -243,9 +253,18 @@ async function populateMicrophones(requestPermission = false) {
     } catch (e) {
         console.error("Error accessing media devices", e);
         micSelect.innerHTML = '<option value="">権限が必要です (マイクを許可してください)</option>';
-        if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
-            // alert('マイクへのアクセスが拒否されました。設定からマイクの権限を許可し、ページをリロードしてください。');
-            console.warn("Permission denied for microphone access. The iframe might need a refresh after permissions are granted in metadata.json");
+        if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError' || (e.message && e.message.includes('Permission denied'))) {
+            const errDisp = document.getElementById('sysErrorArea');
+            const errText = document.getElementById('sysErrorText');
+            if (errDisp && errText) {
+                errDisp.classList.remove('hidden');
+                const isIframe = window.self !== window.top;
+                if (isIframe) {
+                    errText.innerHTML = '<strong>【確認のお願い】</strong>現在のプレビュー枠内では<strong>ブラウザの制限</strong>によりマイクにアクセスできない場合があります。画面右上にある「新しいタブで開く」アイコンから別タブで起動してください。';
+                } else {
+                    errText.innerText = "マイクへのアクセスが拒否されています。ブラウザの設定からマイクの権限を許可してください。";
+                }
+            }
         }
     }
 }
@@ -328,8 +347,22 @@ async function toggleRecording() {
             updateTranscriptionUI();
 
         } catch (e) {
-            alert("録音の開始に失敗しました。マイクの権限を確認してください。");
-            console.error(e);
+            console.error("Media error:", e);
+            const errDisp = document.getElementById('sysErrorArea');
+            const errText = document.getElementById('sysErrorText');
+            if (errDisp && errText) {
+                errDisp.classList.remove('hidden');
+                const isIframe = window.self !== window.top;
+                if (e.name === 'NotAllowedError' || (e.message && e.message.includes("Permission denied"))) {
+                    if (isIframe) {
+                        errText.innerHTML = '<strong>【重要】マイクへのアクセス拒否について</strong><br>現在はAI Studioのプレビュー画面（枠内）で実行されているため、<strong>ブラウザ自体のセキュリティ制限</strong>によりマイクの使用がブロックされています（AIの不具合ではありません）。<br>文字起こしを使用するには、<strong>画面右上にある「新しいタブで開く」アイコンをクリックして、別タブで全画面表示</strong>にしてください。';
+                    } else {
+                        errText.innerHTML = "マイクへのアクセスが拒否されました。ブラウザのURLバーにある鍵マーク（設定）から、このサイトでのマイク使用を「許可」にして再読み込みしてください。";
+                    }
+                } else {
+                    errText.innerText = `録音の開始に失敗しました: ${e.message}\nマイクの設定を確認してください。`;
+                }
+            }
         }
     }
 }
