@@ -18,18 +18,25 @@ let mediaRecorder = null;
 let audioChunks = [];
 let finalTranscript = '';
 let interimTranscript = '';
-let recognition = null;
 let wakeLock = null;
 let currentSessionId = null;
 let currentAudioBlob = null;
 let timerInterval = null;
 let startTime = null;
+let chunkInterval = null;
+let lastTranscribedTime = 0;
 
 // Initialize Lucide Icons globally for static HTML
 try {
     lucide.createIcons();
 } catch (e) {
     console.warn("Lucide auto-init failed, will call manually where needed.", e);
+}
+
+// Ensure error display is hidden when starting
+function hideError() {
+    const errDisp = document.getElementById('sysErrorArea');
+    if (errDisp) errDisp.classList.add('hidden');
 }
 
 // Request Wake Lock
@@ -49,59 +56,28 @@ async function releaseWakeLock() {
     }
 }
 
-// Ensure Web Speech API is maximally optimized
-function initSpeechRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        alert("お使いのブラウザは音声認識をサポートしていません。Chrome エッジ をご利用ください。");
-        return null;
+async function sendToGemini(blob, timeOffsetMs) {
+    const formData = new FormData();
+    formData.append('audio', blob, 'audio.webm');
+    
+    try {
+        const res = await fetch('/api/transcribe', {
+            method: 'POST',
+            body: formData
+        });
+        if (!res.ok) {
+            console.error("Transcribe API error:", await res.text());
+            return;
+        }
+        const data = await res.json();
+        if (data.text) {
+            const timeStr = getFormattedTime(timeOffsetMs);
+            finalTranscript += `\n[${timeStr}] ${data.text}\n`;
+            updateTranscriptionUI();
+        }
+    } catch (e) {
+        console.error("Failed to send chunk:", e);
     }
-    const rec = new SpeechRecognition();
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.lang = 'ja-JP';
-    rec.maxAlternatives = 1;
-
-    rec.onresult = (event) => {
-        let interim = '';
-        const currentTimeParts = getFormattedTime(Date.now() - startTime);
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-            const res = event.results[i];
-            if (res.isFinal) {
-                const text = res[0].transcript.trim();
-                if (text) {
-                    finalTranscript += `\n[${currentTimeParts}] ${text}\n`;
-                }
-            } else {
-                interim += res[0].transcript;
-            }
-        }
-        interimTranscript = interim;
-        updateTranscriptionUI();
-    };
-
-    rec.onerror = (event) => {
-        console.warn("Speech recognition error:", event.error);
-        if (event.error === 'not-allowed') {
-            alert("マイクへのアクセスが拒否されました。");
-            stopRecording();
-        }
-    };
-
-    rec.onend = () => {
-        // Critical for transcription accuracy: keep restarting as long as we are meant to be recording!
-        if (isRecording) {
-            try {
-                rec.start();
-            } catch (e) {
-                console.error("Failed to restart recognition:", e);
-                setTimeout(() => { if (isRecording) rec.start(); }, 500); // Backoff retry
-            }
-        }
-    };
-
-    return rec;
 }
 
 function updateTranscriptionUI() {
@@ -206,10 +182,7 @@ async function toggleRecording() {
 
         try {
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            
-            // Re-init recognition cleanly
-            recognition = initSpeechRecognition();
-            if(!recognition) return;
+            hideError();
             
             audioChunks = [];
             currentAudioBlob = null;
@@ -217,22 +190,37 @@ async function toggleRecording() {
             interimTranscript = '';
             document.getElementById('transcriptionDisplay').innerHTML = '';
             
-            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            
+            let lastAudioIndexSent = 0;
             
             mediaRecorder.ondataavailable = (e) => {
-                if (e.data.size > 0) audioChunks.push(e.data);
+                if (e.data.size > 0) {
+                    audioChunks.push(e.data);
+                }
             };
             
-            mediaRecorder.onstop = () => {
+            mediaRecorder.onstop = async () => {
                 const mimeType = mediaRecorder.mimeType || 'audio/webm';
                 currentAudioBlob = new Blob(audioChunks, { type: mimeType });
                 document.getElementById('downloadAudioBtn').disabled = false;
+                
+                // Final flush to Gemini
+                if (audioChunks.length > lastAudioIndexSent) {
+                    const remainingChunks = audioChunks.slice(lastAudioIndexSent);
+                    const blob = new Blob(remainingChunks, { type: mimeType });
+                    interimTranscript = '最終文字起こし中... (Gemini API)';
+                    updateTranscriptionUI();
+                    await sendToGemini(blob, Date.now() - startTime);
+                    interimTranscript = '';
+                    updateTranscriptionUI();
+                }
+                
                 promptAndSaveSession(); 
             };
             
             // Start components
-            mediaRecorder.start(1000);
-            recognition.start();
+            mediaRecorder.start(3000); // chunk every 3 seconds
             isRecording = true;
             await requestWakeLock();
             
@@ -251,6 +239,27 @@ async function toggleRecording() {
                 document.getElementById('timerDisplay').innerText = getFormattedTime(Date.now() - startTime);
             }, 1000);
             
+            // Send chunk to Gemini every 6 seconds
+            chunkInterval = setInterval(async () => {
+                if (!isRecording) return;
+                if (audioChunks.length > lastAudioIndexSent) {
+                    const chunksToSend = audioChunks.slice(lastAudioIndexSent);
+                    lastAudioIndexSent = audioChunks.length;
+                    
+                    const timeOffsetMs = Date.now() - startTime;
+                    const mimeType = mediaRecorder.mimeType || 'audio/webm';
+                    const blob = new Blob(chunksToSend, { type: mimeType });
+                    
+                    interimTranscript = '文字起こし中... (Gemini API)';
+                    updateTranscriptionUI();
+                    
+                    await sendToGemini(blob, timeOffsetMs);
+                    
+                    interimTranscript = '';
+                    updateTranscriptionUI();
+                }
+            }, 6000);
+            
             updateTranscriptionUI();
 
         } catch (e) {
@@ -263,6 +272,7 @@ async function toggleRecording() {
 function stopRecording() {
     isRecording = false;
     clearInterval(timerInterval);
+    clearInterval(chunkInterval);
     releaseWakeLock();
     
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
@@ -270,14 +280,6 @@ function stopRecording() {
         mediaRecorder.stream.getTracks().forEach(t => t.stop());
     }
     
-    if (recognition) {
-        try { recognition.stop(); } catch(e){}
-    }
-    
-    if (interimTranscript) {
-        finalTranscript += `\n[${document.getElementById('timerDisplay').innerText}] ${interimTranscript}\n`;
-        interimTranscript = '';
-    }
     updateTranscriptionUI();
     
     const recBtn = document.getElementById('recBtn');
@@ -291,8 +293,6 @@ function stopRecording() {
     
     lucide.createIcons();
     document.getElementById('micSelect').disabled = false;
-    
-    // session will be prompted and saved via mediaRecorder.onstop
 }
 
 // Data flow
