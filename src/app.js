@@ -526,7 +526,30 @@ async function populateMicrophones(requestPermission = false) {
             option.value = device.deviceId;
             option.text = device.label || `マイク ${micSelect.options.length + 1}`;
             micSelect.appendChild(option);
-   async function toggleRecording() {
+        });
+        
+    } catch (e) {
+        console.error("Error accessing media devices", e);
+        micSelect.innerHTML = '<option value="">権限が必要です (マイクを許可してください)</option>';
+        if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError' || (e.message && e.message.includes('Permission denied'))) {
+            const errDisp = document.getElementById('sysErrorArea');
+            const errText = document.getElementById('sysErrorText');
+            if (errDisp && errText) {
+                errDisp.classList.remove('hidden');
+                const isIframe = window.self !== window.top;
+                if (isIframe) {
+                    errText.innerHTML = '<strong>【確認のお願い】</strong>現在のプレビュー枠内では<strong>ブラウザの制限</strong>によりマイクにアクセスできない場合があります。画面右上にある「新しいタブで開く」アイコンから別タブで起動してください。';
+                } else {
+                    errText.innerText = "マイクへのアクセスが拒否されています。ブラウザの設定からマイクの権限を許可してください。";
+                }
+            }
+        }
+    }
+}
+
+document.getElementById('refreshMicBtn').addEventListener('click', () => populateMicrophones(true));
+
+async function toggleRecording() {
     const recBtn = document.getElementById('recBtn');
     const recIndicator = document.getElementById('recIndicator');
     const micSelect = document.getElementById('micSelect');
