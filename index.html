@@ -114,6 +114,9 @@
         <div class="p-4 border-b border-slate-800 flex justify-between items-center">
           <span class="text-xs font-bold text-slate-500 tracking-widest uppercase">保存されたセッション</span>
           <div class="flex items-center gap-1">
+            <button id="toggleSelectModeBtn" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition" title="複数選択モード">
+              <i data-lucide="check-square" class="w-5 h-5"></i>
+            </button>
             <button id="newSessionBtn" class="p-1.5 text-blue-400 hover:bg-blue-900/30 rounded-md transition" title="新規セッション">
               <i data-lucide="plus-circle" class="w-5 h-5"></i>
             </button>
@@ -122,11 +125,29 @@
             </button>
           </div>
         </div>
-        <div id="historyList" class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
 
+        <!-- Bulk Select Action Bar (shown only during select mode) -->
+        <div id="bulkSelectActions" class="hidden p-3 bg-slate-900/80 border-b border-slate-800 flex justify-between items-center text-xs">
+          <span id="selectedCountText" class="text-slate-300 font-medium">0 件選択中</span>
+          <div class="flex gap-1.5">
+            <button id="selectAllBtn" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition border border-slate-700 font-medium">すべて選択</button>
+            <button id="deselectAllBtn" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition border border-slate-700 font-medium">解除</button>
+          </div>
+        </div>
+
+        <div id="historyList" class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
           <!-- History items will be injected here -->
           <div class="text-center py-10 text-slate-600 text-xs italic">保存されたデータはありません</div>
         </div>
+
+        <!-- Bulk Delete Action Bar (shown only during select mode) -->
+        <div id="bulkDeleteBar" class="hidden p-3 border-t border-slate-800 bg-slate-900/80 backdrop-blur-md">
+          <button id="bulkDeleteBtn" class="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white py-2.5 rounded-xl font-bold text-xs transition active:scale-95 shadow-lg shadow-red-900/40" disabled>
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+            <span id="bulkDeleteBtnText">選択したセッションを削除</span>
+          </button>
+        </div>
+
         <div class="p-4 border-t border-slate-800 bg-slate-900/50">
           <div class="flex items-center justify-between text-[10px] text-slate-500 mb-2">
             <span class="text-xs font-bold text-slate-500 tracking-widest uppercase">ストレージ使用量</span>
@@ -247,7 +268,7 @@
           
           <div class="bg-slate-950/50 p-4 rounded-xl border border-slate-850 space-y-3">
             <h4 class="font-bold text-slate-200 text-xs tracking-wider uppercase flex items-center gap-1.5">
-              <i data-lucide="chrome" class="w-3.5 h-3.5 text-blue-400"></i> Google Chrome / Microsoft Edge
+              <i data-lucide="globe" class="w-3.5 h-3.5 text-blue-400"></i> Google Chrome / Microsoft Edge
             </h4>
             <ol class="list-decimal pl-4 space-y-1 text-slate-400 text-xs">
               <li>アドレスバー左側の<strong class="text-slate-200">鍵アイコン</strong>をクリックします。</li>

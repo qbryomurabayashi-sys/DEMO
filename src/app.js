@@ -68,6 +68,44 @@ let chunkInterval = null;
 let lastTranscribedTime = 0;
 let lastStartTimestamp = 0;
 
+// Multiple Selection States
+let isSelectMode = false;
+let selectedSessionIds = [];
+
+function toggleSessionSelection(id, checked) {
+    if (checked) {
+        if (!selectedSessionIds.includes(id)) {
+            selectedSessionIds.push(id);
+        }
+    } else {
+        selectedSessionIds = selectedSessionIds.filter(itemId => itemId !== id);
+    }
+    updateBulkSelectUI();
+}
+
+function updateBulkSelectUI() {
+    const countText = document.getElementById('selectedCountText');
+    const deleteBtn = document.getElementById('bulkDeleteBtn');
+    const deleteBtnText = document.getElementById('bulkDeleteBtnText');
+    
+    if (countText) {
+        countText.innerText = `${selectedSessionIds.length} 件選択中`;
+    }
+    
+    if (deleteBtn) {
+        deleteBtn.disabled = selectedSessionIds.length === 0;
+        if (selectedSessionIds.length === 0) {
+            deleteBtn.className = "w-full flex items-center justify-center gap-2 bg-slate-800 text-slate-500 py-2.5 rounded-xl font-bold text-xs cursor-not-allowed border border-slate-750";
+        } else {
+            deleteBtn.className = "w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white py-2.5 rounded-xl font-bold text-xs transition active:scale-95 shadow-lg shadow-red-900/40";
+        }
+    }
+    
+    if (deleteBtnText) {
+        deleteBtnText.innerText = `選択したセッションを削除 (${selectedSessionIds.length}件)`;
+    }
+}
+
 function updateSpeechStatus(status, text) {
     const badge = document.getElementById('speechStatusBadge');
     const dot = document.getElementById('speechStatusDot');
@@ -799,42 +837,82 @@ function loadHistory() {
             const timeStr = new Date(session.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             
             const item = document.createElement('div');
-            item.className = `p-3 rounded-lg border cursor-pointer hover:bg-slate-800 transition group mb-2 ${currentSessionId === session.id ? 'border-blue-500 bg-blue-900/20' : 'border-slate-800 bg-slate-900/40'}`;
+            item.className = `p-3 rounded-lg border cursor-pointer hover:bg-slate-800 transition group mb-2 relative ${
+                isSelectMode ? 'select-mode-active' : ''
+            } ${
+                currentSessionId === session.id ? 'border-blue-500 bg-blue-900/20' : 'border-slate-800 bg-slate-900/40'
+            }`;
+            
+            const isChecked = selectedSessionIds.includes(session.id);
             
             item.innerHTML = `
-                <div class="flex justify-between items-start mb-1">
-                    <h4 class="font-bold text-slate-200 text-sm truncate pr-2 group-hover:text-blue-400 transition" 
-                        onclick="loadSpecificSession(${session.id})" title="${session.title}">${session.title}</h4>
-                </div>
-                <div class="flex justify-between items-center text-[10px] text-slate-500">
-                    <span>${dateStr} ${timeStr}</span>
-                    <div class="flex gap-2">
-                        <button class="edit-session-btn p-1.5 text-slate-300 hover:text-emerald-400 bg-slate-800 hover:bg-slate-700 rounded transition border border-slate-700" data-id="${session.id}" title="タイトル編集">
-                            <i data-lucide="edit-2" class="w-4 h-4"></i>
-                        </button>
-                        <button class="delete-session-btn p-1.5 text-slate-300 hover:text-red-400 bg-slate-800 hover:bg-slate-700 rounded transition border border-slate-700" data-id="${session.id}" title="このセッションを削除">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
+                <div class="session-item-inner">
+                    <div class="session-item-checkbox-wrapper">
+                        <input type="checkbox" class="custom-checkbox session-checkbox" data-id="${session.id}" ${isChecked ? 'checked' : ''}>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-start mb-1">
+                            <h4 class="font-bold text-slate-200 text-sm truncate pr-2 group-hover:text-blue-400 transition" 
+                                title="${session.title}">${session.title}</h4>
+                        </div>
+                        <div class="flex justify-between items-center text-[10px] text-slate-500">
+                            <span>${dateStr} ${timeStr}</span>
+                            ${!isSelectMode ? `
+                                <div class="flex gap-2">
+                                    <button class="edit-session-btn p-1.5 text-slate-300 hover:text-emerald-400 bg-slate-800 hover:bg-slate-700 rounded transition border border-slate-700" data-id="${session.id}" title="タイトル編集">
+                                        <i data-lucide="edit-2" class="w-4 h-4"></i>
+                                    </button>
+                                    <button class="delete-session-btn p-1.5 text-slate-300 hover:text-red-400 bg-slate-800 hover:bg-slate-700 rounded transition border border-slate-700" data-id="${session.id}" title="このセッションを削除">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
                     </div>
                 </div>
             `;
+            
+            // Add click listener
+            item.addEventListener('click', (ev) => {
+                if (isSelectMode) {
+                    const checkbox = item.querySelector('.session-checkbox');
+                    if (checkbox) {
+                        checkbox.checked = !checkbox.checked;
+                        toggleSessionSelection(session.id, checkbox.checked);
+                    }
+                } else {
+                    loadSpecificSession(session.id);
+                }
+            });
+            
+            // Prevent double-trigger when clicking directly on the checkbox
+            const checkbox = item.querySelector('.session-checkbox');
+            if (checkbox) {
+                checkbox.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    toggleSessionSelection(session.id, checkbox.checked);
+                });
+            }
+            
             list.appendChild(item);
         });
         
-        // Setup listeners for edit/delete
-        document.querySelectorAll('.edit-session-btn').forEach(btn => {
-            btn.addEventListener('click', (ev) => {
-                ev.stopPropagation();
-                editSessionTitle(parseInt(btn.getAttribute('data-id')));
+        // Setup listeners for edit/delete (only active when not in select mode)
+        if (!isSelectMode) {
+            document.querySelectorAll('.edit-session-btn').forEach(btn => {
+                btn.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    editSessionTitle(parseInt(btn.getAttribute('data-id')));
+                });
             });
-        });
-        
-        document.querySelectorAll('.delete-session-btn').forEach(btn => {
-            btn.addEventListener('click', (ev) => {
-                ev.stopPropagation();
-                deleteSession(parseInt(btn.getAttribute('data-id')));
+            
+            document.querySelectorAll('.delete-session-btn').forEach(btn => {
+                btn.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    deleteSession(parseInt(btn.getAttribute('data-id')));
+                });
             });
-        });
+        }
         
         // Update Storage visually
         const mb = (totalBytes / (1024 * 1024)).toFixed(1);
@@ -1048,6 +1126,106 @@ document.addEventListener('DOMContentLoaded', () => {
 
     closeSidebarBtn?.addEventListener('click', () => {
         sidebar.classList.add('-translate-x-full');
+    });
+
+    // Multiple Selection Event Bindings
+    const toggleSelectModeBtn = document.getElementById('toggleSelectModeBtn');
+    const bulkSelectActions = document.getElementById('bulkSelectActions');
+    const bulkDeleteBar = document.getElementById('bulkDeleteBar');
+
+    toggleSelectModeBtn?.addEventListener('click', () => {
+        if (isRecording) {
+            alert("録音中は複数選択モードに切り替えることはできません。");
+            return;
+        }
+        isSelectMode = !isSelectMode;
+        selectedSessionIds = []; // Reset selected IDs
+        
+        if (isSelectMode) {
+            toggleSelectModeBtn.classList.remove('text-slate-400');
+            toggleSelectModeBtn.classList.add('text-blue-400', 'bg-blue-900/20', 'border', 'border-blue-500/30');
+            bulkSelectActions?.classList.remove('hidden');
+            bulkDeleteBar?.classList.remove('hidden');
+        } else {
+            toggleSelectModeBtn.className = "p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition";
+            bulkSelectActions?.classList.add('hidden');
+            bulkDeleteBar?.classList.add('hidden');
+        }
+        
+        updateBulkSelectUI();
+        loadHistory();
+    });
+
+    document.getElementById('selectAllBtn')?.addEventListener('click', () => {
+        if (!db) return;
+        const tx = db.transaction('sessions', 'readonly');
+        const store = tx.objectStore('sessions');
+        store.getAll().onsuccess = (e) => {
+            const sessions = e.target.result;
+            selectedSessionIds = sessions.map(s => s.id);
+            updateBulkSelectUI();
+            loadHistory();
+        };
+    });
+
+    document.getElementById('deselectAllBtn')?.addEventListener('click', () => {
+        selectedSessionIds = [];
+        updateBulkSelectUI();
+        loadHistory();
+    });
+
+    document.getElementById('bulkDeleteBtn')?.addEventListener('click', async () => {
+        if (selectedSessionIds.length === 0) return;
+        
+        const confirmed = await customConfirm(
+            "選択したセッションの一括削除",
+            `選択した ${selectedSessionIds.length} 件のセッションをすべて削除しますか？\n(削除したデータは元に戻すことはできません)`,
+            true
+        );
+        
+        if (confirmed) {
+            const tx = db.transaction('sessions', 'readwrite');
+            const store = tx.objectStore('sessions');
+            
+            let deletedCurrentSession = false;
+            
+            selectedSessionIds.forEach(id => {
+                store.delete(id);
+                if (currentSessionId === id) {
+                    deletedCurrentSession = true;
+                }
+            });
+            
+            tx.oncomplete = () => {
+                if (deletedCurrentSession) {
+                    finalTranscript = '';
+                    interimTranscript = '';
+                    currentAudioBlob = null;
+                    currentSessionId = null;
+                    updateTranscriptionUI();
+                    document.getElementById('downloadAudioBtn').disabled = true;
+                    document.getElementById('downloadTransBtn').disabled = true;
+                }
+                
+                // Exit select mode
+                isSelectMode = false;
+                selectedSessionIds = [];
+                
+                if (toggleSelectModeBtn) {
+                    toggleSelectModeBtn.className = "p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition";
+                }
+                bulkSelectActions?.classList.add('hidden');
+                bulkDeleteBar?.classList.add('hidden');
+                
+                updateBulkSelectUI();
+                loadHistory();
+            };
+            
+            tx.onerror = (e) => {
+                console.error("Bulk delete transaction failed:", e);
+                alert("セッションの一括削除中にエラーが発生しました。");
+            };
+        }
     });
 });
 
