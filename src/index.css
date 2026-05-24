@@ -66,3 +66,40 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.4);
 }
+
+/* Premium Modal Animations */
+div[id$="Modal"] {
+  transition: opacity 250ms ease-out;
+  opacity: 0;
+}
+
+div[id$="Modal"]:not(.hidden) {
+  opacity: 1;
+}
+
+div[id$="Modal"] > div {
+  transition: transform 250ms cubic-bezier(0.16, 1, 0.3, 1), opacity 250ms ease-out;
+  transform: scale(0.95);
+  opacity: 0;
+}
+
+div[id$="Modal"]:not(.hidden) > div {
+  transform: scale(1);
+  opacity: 1;
+}
+
+/* Modal Open Helper */
+.modal-active {
+  overflow: hidden;
+}
+
+/* Warning & Guidance box highlights */
+#iframeWarningBox {
+  animation: pulse-border 2.5s infinite;
+}
+
+@keyframes pulse-border {
+  0% { border-color: rgba(245, 158, 11, 0.2); }
+  50% { border-color: rgba(245, 158, 11, 0.5); }
+  100% { border-color: rgba(245, 158, 11, 0.2); }
+}

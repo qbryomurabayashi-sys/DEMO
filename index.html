@@ -217,6 +217,80 @@
       </div>
     </div>
 
+    <!-- Custom Mic Permission Guidance Modal -->
+    <div id="micPermissionModal" class="fixed inset-0 bg-slate-950/85 z-[210] hidden flex items-center justify-center p-4 backdrop-blur-md">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl transform scale-95 transition-all duration-300">
+        <div class="flex items-center gap-3 mb-4 text-amber-500">
+          <div class="bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
+            <i data-lucide="mic-off" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-xl font-bold text-slate-100">マイク権限が必要です</h3>
+        </div>
+        <div class="space-y-4 text-slate-300 text-sm mb-6 leading-relaxed">
+          <p>録音とリアルタイム文字起こしを開始するには、ブラウザでのマイク使用許可が必要です。</p>
+          
+          <div class="bg-slate-950/50 p-4 rounded-xl border border-slate-850 space-y-3">
+            <h4 class="font-bold text-slate-200 text-xs tracking-wider uppercase flex items-center gap-1.5">
+              <i data-lucide="chrome" class="w-3.5 h-3.5 text-blue-400"></i> Google Chrome / Microsoft Edge
+            </h4>
+            <ol class="list-decimal pl-4 space-y-1 text-slate-400 text-xs">
+              <li>アドレスバー左側の<strong class="text-slate-200">鍵アイコン</strong>をクリックします。</li>
+              <li>「マイク」の設定を<strong class="text-blue-400">「許可」</strong>に変更します。</li>
+              <li>ページを再読み込み（リロード）して再試行してください。</li>
+            </ol>
+          </div>
+
+          <div id="iframeWarningBox" class="bg-amber-500/10 border border-amber-500/20 text-amber-200 p-3.5 rounded-xl text-xs flex gap-2.5">
+            <i data-lucide="alert-circle" class="w-4 h-4 shrink-0 text-amber-400"></i>
+            <div>
+              <strong>プレビュー画面（枠内）で実行中の場合：</strong><br>
+              ブラウザのセキュリティ制限により、この枠内ではマイクが許可されません。画面右上にある<strong>「新しいタブで開く」アイコン</strong>から起動してください。
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <button id="closePermissionModalBtn" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-sm font-bold transition">閉じる</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom Session Save Input Modal -->
+    <div id="saveSessionModal" class="fixed inset-0 bg-slate-950/85 z-[210] hidden flex items-center justify-center p-4 backdrop-blur-md">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl transform scale-95 transition-all duration-300">
+        <div class="flex items-center gap-3 mb-4 text-blue-400">
+          <div class="bg-blue-500/10 p-2.5 rounded-xl border border-blue-500/20">
+            <i data-lucide="save" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-xl font-bold text-slate-100">セッションの保存</h3>
+        </div>
+        <div class="mb-5">
+          <label for="sessionTitleInput" class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">会議のタイトル</label>
+          <input type="text" id="sessionTitleInput" class="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition" placeholder="タイトルを入力...">
+        </div>
+        <div class="flex justify-end gap-3">
+          <button id="cancelSaveBtn" class="px-5 py-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl text-sm font-bold transition">保存しない</button>
+          <button id="confirmSaveBtn" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition shadow-lg shadow-blue-900/40">保存する</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom Reusable Confirm Modal -->
+    <div id="customConfirmModal" class="fixed inset-0 bg-slate-950/85 z-[210] hidden flex items-center justify-center p-4 backdrop-blur-md">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl transform scale-95 transition-all duration-300">
+        <div class="flex items-center gap-3 mb-4 text-red-400" id="confirmHeader">
+          <div class="bg-red-500/10 p-2.5 rounded-xl border border-red-500/20" id="confirmIconBox">
+            <i data-lucide="alert-triangle" class="w-6 h-6" id="confirmIcon"></i>
+          </div>
+          <h3 class="text-xl font-bold text-slate-100" id="confirmTitle">確認</h3>
+        </div>
+        <p class="text-slate-300 text-sm mb-6 leading-relaxed" id="confirmMessage">本当にこの操作を実行しますか？</p>
+        <div class="flex justify-end gap-3">
+          <button id="cancelConfirmBtn" class="px-5 py-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl text-sm font-bold transition">キャンセル</button>
+          <button id="confirmConfirmBtn" class="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-bold transition shadow-lg shadow-red-900/40">実行する</button>
+        </div>
+      </div>
+    </div>
+
 
 
     <!-- Main Logic as ES Module -->

@@ -12,6 +12,26 @@ dbReq.onsuccess = (e) => {
     console.log("Database initialized.");
     loadHistory();
 };
+dbReq.onerror = (e) => {
+    console.error("Database failed to open:", e.target.error);
+    alert("データベースの初期化に失敗しました。プライベートブラウジングモードなど、履歴の保存に制限がある可能性があります。履歴への保存機能は無効になります。");
+};
+
+// Help helper to update session text in background
+function updateSessionTextInDB(id, text) {
+    if (!db) return;
+    const tx = db.transaction('sessions', 'readwrite');
+    const store = tx.objectStore('sessions');
+    store.get(id).onsuccess = (e) => {
+        const session = e.target.result;
+        if (session) {
+            session.text = text;
+            store.put(session).onsuccess = () => {
+                console.log("Session text auto-updated in DB.");
+            };
+        }
+    };
+}
 
 let isRecording = false;
 let mediaRecorder = null;
@@ -27,12 +47,158 @@ let startTime = null;
 let chunkInterval = null;
 let lastTranscribedTime = 0;
 
-// Initialize Lucide Icons globally for static HTML
-try {
-    lucide.createIcons();
-} catch (e) {
-    console.warn("Lucide auto-init failed, will call manually where needed.", e);
+// Dynamic check for browser audio formats to prevent Safari/iOS crashes
+function getSupportedMimeType() {
+    const types = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/ogg',
+        'audio/mp4',
+        'audio/aac',
+        'audio/wav'
+    ];
+    for (const type of types) {
+        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(type)) {
+            return type;
+        }
+    }
+    return ''; // Fallback to browser default
 }
+
+// Reusable custom async confirm modal
+function customConfirm(title, message, isDangerous = false) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('customConfirmModal');
+        const titleEl = document.getElementById('confirmTitle');
+        const messageEl = document.getElementById('confirmMessage');
+        const confirmBtn = document.getElementById('confirmConfirmBtn');
+        const cancelBtn = document.getElementById('cancelConfirmBtn');
+        const iconBox = document.getElementById('confirmIconBox');
+        
+        titleEl.innerText = title;
+        messageEl.innerHTML = message.replace(/\n/g, '<br>');
+        
+        if (isDangerous) {
+            confirmBtn.className = "px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-bold transition shadow-lg shadow-red-900/40";
+            iconBox.className = "bg-red-500/10 p-2.5 rounded-xl border border-red-500/20 text-red-500";
+        } else {
+            confirmBtn.className = "px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition shadow-lg shadow-blue-900/40";
+            iconBox.className = "bg-blue-500/10 p-2.5 rounded-xl border border-blue-500/20 text-blue-500";
+        }
+        
+        document.body.classList.add('modal-active');
+        modal.classList.remove('hidden');
+        safeCreateIcons();
+        
+        const onConfirm = () => {
+            cleanup();
+            resolve(true);
+        };
+        const onCancel = () => {
+            cleanup();
+            resolve(false);
+        };
+        
+        function cleanup() {
+            confirmBtn.removeEventListener('click', onConfirm);
+            cancelBtn.removeEventListener('click', onCancel);
+            modal.classList.add('hidden');
+            document.body.classList.remove('modal-active');
+        }
+        
+        confirmBtn.addEventListener('click', onConfirm);
+        cancelBtn.addEventListener('click', onCancel);
+    });
+}
+
+// Generic custom async prompt modal for title inputs
+function customPrompt(heading, labelText, defaultVal) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('saveSessionModal');
+        const titleEl = modal.querySelector('h3');
+        const labelEl = modal.querySelector('label');
+        const input = document.getElementById('sessionTitleInput');
+        const confirmBtn = document.getElementById('confirmSaveBtn');
+        const cancelBtn = document.getElementById('cancelSaveBtn');
+        
+        titleEl.innerText = heading;
+        labelEl.innerText = labelText;
+        input.value = defaultVal;
+        
+        document.body.classList.add('modal-active');
+        modal.classList.remove('hidden');
+        input.focus();
+        input.select();
+        
+        const onConfirm = () => {
+            const val = input.value.trim();
+            cleanup();
+            resolve(val);
+        };
+        const onCancel = () => {
+            cleanup();
+            resolve(null);
+        };
+        const onKeyPress = (e) => {
+            if (e.key === 'Enter') {
+                onConfirm();
+            }
+        };
+        
+        function cleanup() {
+            confirmBtn.removeEventListener('click', onConfirm);
+            cancelBtn.removeEventListener('click', onCancel);
+            input.removeEventListener('keypress', onKeyPress);
+            modal.classList.add('hidden');
+            document.body.classList.remove('modal-active');
+        }
+        
+        confirmBtn.addEventListener('click', onConfirm);
+        cancelBtn.addEventListener('click', onCancel);
+        input.addEventListener('keypress', onKeyPress);
+    });
+}
+
+// Guidance Modal for Mic permissions
+function showMicPermissionModal() {
+    const modal = document.getElementById('micPermissionModal');
+    const closeBtn = document.getElementById('closePermissionModalBtn');
+    
+    const isIframe = window.self !== window.top;
+    const warningBox = document.getElementById('iframeWarningBox');
+    if (warningBox) {
+        if (isIframe) {
+            warningBox.classList.remove('hidden');
+        } else {
+            warningBox.classList.add('hidden');
+        }
+    }
+    
+    document.body.classList.add('modal-active');
+    modal.classList.remove('hidden');
+    safeCreateIcons();
+    
+    const onClose = () => {
+        modal.classList.add('hidden');
+        document.body.classList.remove('modal-active');
+        closeBtn.removeEventListener('click', onClose);
+    };
+    
+    closeBtn.addEventListener('click', onClose);
+}
+
+// Initialize Lucide Icons globally for static HTML
+function safeCreateIcons() {
+    try {
+        if (typeof lucide !== 'undefined' && lucide.createIcons) {
+            lucide.createIcons();
+        }
+    } catch (e) {
+        console.warn("Lucide auto-render failed, will call manually where needed.", e);
+    }
+}
+safeCreateIcons();
 
 // Ensure error display is hidden when starting
 function hideError() {
@@ -57,11 +223,10 @@ async function releaseWakeLock() {
     }
 }
 
-// Ensure Web Speech API is maximally optimized
+// Ensure Web Speech API is maximally optimized and resilient
 function initSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-        alert("お使いのブラウザは音声認識をサポートしていません。Chrome エッジ をご利用ください。");
         return null;
     }
     const rec = new SpeechRecognition();
@@ -122,36 +287,50 @@ function initSpeechRecognition() {
 
     rec.onerror = (event) => {
         console.warn("Speech recognition error:", event.error);
+        
+        if (event.error === 'no-speech' || event.error === 'aborted') {
+            // Ignore these non-fatal errors during silence or resets
+            return;
+        }
+
         const errDisp = document.getElementById('sysErrorArea');
         const errText = document.getElementById('sysErrorText');
-        if (errDisp && errText) {
-            errDisp.classList.remove('hidden');
-            if (event.error === 'not-allowed') {
+        
+        if (event.error === 'not-allowed') {
+            // Permission denied: fatal. Stop recording, show guidance modal
+            if (errDisp && errText) {
+                errDisp.classList.remove('hidden');
                 const isIframe = window.self !== window.top;
                 if (isIframe) {
                     errText.innerHTML = '<strong>【重要】マイクへのアクセス拒否について</strong><br>現在はプレビュー画面で実行されているため、ブラウザのセキュリティ制限によりマイクがブロックされています。<br><strong>右上の「新しいタブで開く」アイコンから起動し直してください。</strong>';
                 } else {
                     errText.innerText = "マイクへのアクセスが拒否されました。ブラウザの設定でマイクを「許可」してリロードしてください。";
                 }
-            } else if (event.error === 'network') {
-                errText.innerText = "ネットワークエラーのため文字起こしが停止しました。";
-            } else {
-                errText.innerText = "音声認識エラー: " + event.error;
             }
+            showMicPermissionModal();
+            stopRecording();
+        } else if (event.error === 'network') {
+            // Network error: NON-FATAL! Do NOT stop mediaRecorder, just alert visually and let onend restart it
+            console.warn("Speech recognition network error. Keep recording. SpeechRecognition will restart.");
+            interimTranscript = "(ネットワーク一時接続切れ - 文字起こし自動再接続中...)";
+            updateTranscriptionUI();
+        } else {
+            // Other errors: NON-FATAL. Do NOT stop mediaRecorder.
+            console.warn("Non-fatal speech recognition error: " + event.error + ". Keep recording.");
+            interimTranscript = `(音声認識が一時的に利用不可: ${event.error} - 録音は継続中...)`;
+            updateTranscriptionUI();
         }
-        stopRecording();
     };
 
     rec.onend = () => {
-        // Critical for transcription accuracy: keep restarting as long as we are meant to be recording!
+        // Keep restarting speech recognition as long as isRecording is true
         if (isRecording) {
-            interimTranscript = "(認識リセット中...)";
-            updateTranscriptionUI();
+            console.log("Speech recognition ended. Attempting automatic restart...");
             try {
                 rec.start();
             } catch (e) {
                 console.error("Failed to restart recognition:", e);
-                setTimeout(() => { if (isRecording) rec.start(); }, 500); // Backoff retry
+                setTimeout(() => { if (isRecording) rec.start(); }, 1000); // Backoff retry after 1 sec
             }
         }
     };
@@ -190,7 +369,7 @@ function updateTranscriptionUI() {
             `;
             placeholder.style.display = 'flex';
             placeholder.classList.remove('opacity-40');
-            lucide.createIcons();
+            safeCreateIcons();
             
             interimDisp.innerText = interimTranscript; // Show the waiting message
         } else {
@@ -201,7 +380,7 @@ function updateTranscriptionUI() {
             `;
             placeholder.style.display = 'flex';
             placeholder.classList.add('opacity-40');
-            lucide.createIcons();
+            safeCreateIcons();
         }
         display.innerHTML = '';
     }
@@ -219,6 +398,10 @@ function getFormattedTime(ms) {
 
 async function populateMicrophones(requestPermission = false) {
     const micSelect = document.getElementById('micSelect');
+    if (!navigator || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        micSelect.innerHTML = '<option value="">マイク情報を取得できません(非推奨ブラウザ/セキュア接続なし)</option>';
+        return;
+    }
     try {
         if (requestPermission) {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -246,7 +429,7 @@ async function populateMicrophones(requestPermission = false) {
         audioInputs.forEach((device) => {
             const option = document.createElement('option');
             option.value = device.deviceId;
-            option.text = device.label || `マイク ${micSelect.length + 1}`;
+            option.text = device.label || `マイク ${micSelect.options.length + 1}`;
             micSelect.appendChild(option);
         });
         
@@ -272,6 +455,7 @@ async function populateMicrophones(requestPermission = false) {
 document.getElementById('refreshMicBtn').addEventListener('click', () => populateMicrophones(true));
 
 // Setup recording
+// Setup recording
 async function toggleRecording() {
     const recBtn = document.getElementById('recBtn');
     const recIndicator = document.getElementById('recIndicator');
@@ -295,12 +479,20 @@ async function toggleRecording() {
 
             // Re-init recognition cleanly
             recognition = initSpeechRecognition();
-            if(!recognition) return;
-            
-            try {
-                recognition.start();
-            } catch(e) {
-                console.error("Failed to start recognition:", e);
+            if (recognition) {
+                try {
+                    recognition.start();
+                } catch(e) {
+                    console.error("Failed to start recognition:", e);
+                }
+            } else {
+                console.warn("Speech recognition is not supported in this browser. Audio recording will continue without live transcription.");
+                const errDisp = document.getElementById('sysErrorArea');
+                const errText = document.getElementById('sysErrorText');
+                if (errDisp && errText) {
+                    errDisp.classList.remove('hidden');
+                    errText.innerHTML = '<strong>【お知らせ】</strong>お使いのブラウザはリアルタイム文字起こし（Web Speech API）に対応していないため、<strong>音声の録音と手動メモ機能のみ</strong>が利用可能です。文字起こしを使用するには、PCの <strong>Chrome</strong> または <strong>Edge</strong> をご使用ください。';
+                }
             }
             
             hideError();
@@ -311,18 +503,22 @@ async function toggleRecording() {
             interimTranscript = '';
             document.getElementById('transcriptionDisplay').innerHTML = '';
             
-            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            // Dynamic MIME type selection to prevent crashes in Safari/Firefox
+            const mimeType = getSupportedMimeType();
+            const options = mimeType ? { mimeType } : {};
+            console.log("Initializing MediaRecorder with mimeType:", mimeType || "default");
+            mediaRecorder = new MediaRecorder(stream, options);
             
             mediaRecorder.ondataavailable = (e) => {
                 if (e.data.size > 0) audioChunks.push(e.data);
             };
             
-            mediaRecorder.onstop = () => {
-                const mimeType = mediaRecorder.mimeType || 'audio/webm';
-                currentAudioBlob = new Blob(audioChunks, { type: mimeType });
+            mediaRecorder.onstop = async () => {
+                const actualMimeType = mediaRecorder.mimeType || 'audio/webm';
+                currentAudioBlob = new Blob(audioChunks, { type: actualMimeType });
                 document.getElementById('downloadAudioBtn').disabled = false;
                 
-                promptAndSaveSession(); 
+                await promptAndSaveSession(); 
             };
             
             mediaRecorder.start(1000);
@@ -336,7 +532,7 @@ async function toggleRecording() {
             recIndicator.classList.remove('bg-slate-600');
             recIndicator.classList.add('bg-red-500', 'animate-pulse', 'shadow-[0_0_15px_rgba(239,68,68,0.6)]');
             
-            lucide.createIcons();
+            safeCreateIcons();
             micSelect.disabled = true;
             
             startTime = Date.now();
@@ -359,6 +555,7 @@ async function toggleRecording() {
                     } else {
                         errText.innerHTML = "マイクへのアクセスが拒否されました。ブラウザのURLバーにある鍵マーク（設定）から、このサイトでのマイク使用を「許可」にして再読み込みしてください。";
                     }
+                    showMicPermissionModal();
                 } else {
                     errText.innerText = `録音の開始に失敗しました: ${e.message}\nマイクの設定を確認してください。`;
                 }
@@ -397,21 +594,20 @@ function stopRecording() {
     recIndicator.classList.remove('bg-red-500', 'animate-pulse', 'shadow-[0_0_15px_rgba(239,68,68,0.6)]');
     recIndicator.classList.add('bg-slate-600');
     
-    lucide.createIcons();
+    safeCreateIcons();
     document.getElementById('micSelect').disabled = false;
 }
 
-// Data flow
-function promptAndSaveSession() {
+// Data flow using custom async prompt modal
+async function promptAndSaveSession() {
     if (!finalTranscript.trim() && !currentAudioBlob) return;
     
     const defaultTitle = new Date().toLocaleString() + " の会議";
-    const userTitle = prompt("録音を終了しました。\nセッションのタイトルを入力して保存しますか？", defaultTitle);
+    const userTitle = await customPrompt("セッションの保存", "会議のタイトル", defaultTitle);
     
-    if (userTitle !== null) {
-        saveSessionToDB(userTitle.trim() || defaultTitle);
+    if (userTitle !== null && userTitle.trim() !== "") {
+        saveSessionToDB(userTitle.trim());
     } else {
-        // Just save with default if cancelled to prevent loss, actually let's save as "未設定"
         saveSessionToDB(defaultTitle + " (自動保存)");
     }
 }
@@ -514,7 +710,7 @@ function loadHistory() {
         const percentage = Math.min((totalBytes / (500 * 1024 * 1024)) * 100, 100); 
         document.getElementById('storageUsageBar').style.width = `${percentage}%`;
         
-        lucide.createIcons();
+        safeCreateIcons();
     };
 }
 
@@ -539,6 +735,9 @@ window.loadSpecificSession = function(id) {
             interimTranscript = '';
             currentAudioBlob = session.audioBlob;
             
+            // Reset timer text
+            document.getElementById('timerDisplay').innerText = "00:00:00";
+            
             updateTranscriptionUI();
             document.getElementById('downloadAudioBtn').disabled = !currentAudioBlob;
             loadHistory(); // To update the blue border styling
@@ -550,11 +749,11 @@ function editSessionTitle(id) {
     if (!db) return;
     const tx = db.transaction('sessions', 'readonly');
     const store = tx.objectStore('sessions');
-    store.get(id).onsuccess = (e) => {
+    store.get(id).onsuccess = async (e) => {
         const session = e.target.result;
         if (!session) return;
         
-        const newTitle = prompt("新しいタイトルを入力してください:", session.title);
+        const newTitle = await customPrompt("タイトルの編集", "新しいタイトル", session.title);
         if (newTitle && newTitle.trim() !== "") {
             session.title = newTitle.trim();
             const wTx = db.transaction('sessions', 'readwrite');
@@ -565,8 +764,14 @@ function editSessionTitle(id) {
     };
 }
 
-function deleteSession(id) {
-    if(confirm("この保存済みセッションを削除しますか？\n(元に戻すことはできません)")) {
+async function deleteSession(id) {
+    const confirmed = await customConfirm(
+        "セッションの削除",
+        "この保存済みセッションを削除しますか？\n(削除したデータは元に戻すことはできません)",
+        true
+    );
+    
+    if(confirmed) {
         const tx = db.transaction('sessions', 'readwrite');
         tx.objectStore('sessions').delete(id).onsuccess = () => {
             if (currentSessionId === id) {
@@ -591,8 +796,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('recBtn').addEventListener('click', toggleRecording);
     
     // Buttons
-    document.getElementById('clearDataBtn').addEventListener('click', () => {
-        if(confirm("画面上のテキストと直近の音声を消去しますか？\n※履歴に保存済みのデータは削除されません。")) {
+    document.getElementById('clearDataBtn').addEventListener('click', async () => {
+        const confirmed = await customConfirm(
+            "表示のクリア",
+            "画面上のテキストと直近の音声を消去しますか？\n※履歴に保存済みのデータは削除されません。",
+            false
+        );
+        if(confirmed) {
             finalTranscript = '';
             interimTranscript = '';
             currentAudioBlob = null;
@@ -644,6 +854,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
+    // New Session Button binding
+    document.getElementById('newSessionBtn').addEventListener('click', async () => {
+        if (isRecording) {
+            alert("録音中は新規セッションに切り替えることはできません。");
+            return;
+        }
+        const confirmed = await customConfirm(
+            "新規セッションの開始",
+            "現在の画面表示をリセットし、新しい文字起こしセッションを開始しますか？\n（すでに履歴に保存されているデータは消えません）",
+            false
+        );
+        if (confirmed) {
+            finalTranscript = '';
+            interimTranscript = '';
+            currentAudioBlob = null;
+            currentSessionId = null;
+            updateTranscriptionUI();
+            loadHistory();
+            document.getElementById('timerDisplay').innerText = "00:00:00";
+        }
+    });
+    
     function addMemo() {
         const input = document.getElementById('manualMemoInput');
         const text = input.value.trim();
@@ -655,6 +887,11 @@ document.addEventListener('DOMContentLoaded', () => {
         finalTranscript += memoEntry;
         input.value = '';
         updateTranscriptionUI();
+        
+        // Auto-save memo to IndexedDB if view session exists
+        if (currentSessionId && db) {
+            updateSessionTextInDB(currentSessionId, finalTranscript);
+        }
     }
     
     // Sidebar toggle for mobile
