@@ -1,3 +1,23 @@
+// Force unregister all PWA Service Workers and clear caches to completely bypass browser caching issues
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let registration of registrations) {
+            registration.unregister().then(() => {
+                console.log("Stale Service Worker unregistered successfully.");
+            });
+        }
+    }).catch(err => console.warn("Failed to unregister SW:", err));
+}
+if ('caches' in window) {
+    caches.keys().then(function(names) {
+        for (let name of names) {
+            caches.delete(name).then(() => {
+                console.log("Stale Cache cleared successfully:", name);
+            });
+        }
+    }).catch(err => console.warn("Failed to clear cache:", err));
+}
+
 // Setup IndexedDB
 let db = null;
 const dbReq = indexedDB.open("LocalAIAssistantDB", 3);
@@ -506,39 +526,16 @@ async function populateMicrophones(requestPermission = false) {
             option.value = device.deviceId;
             option.text = device.label || `マイク ${micSelect.options.length + 1}`;
             micSelect.appendChild(option);
-        });
-        
-    } catch (e) {
-        console.error("Error accessing media devices", e);
-        micSelect.innerHTML = '<option value="">権限が必要です (マイクを許可してください)</option>';
-        if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError' || (e.message && e.message.includes('Permission denied'))) {
-            const errDisp = document.getElementById('sysErrorArea');
-            const errText = document.getElementById('sysErrorText');
-            if (errDisp && errText) {
-                errDisp.classList.remove('hidden');
-                const isIframe = window.self !== window.top;
-                if (isIframe) {
-                    errText.innerHTML = '<strong>【確認のお願い】</strong>現在のプレビュー枠内では<strong>ブラウザの制限</strong>によりマイクにアクセスできない場合があります。画面右上にある「新しいタブで開く」アイコンから別タブで起動してください。';
-                } else {
-                    errText.innerText = "マイクへのアクセスが拒否されています。ブラウザの設定からマイクの権限を許可してください。";
-                }
-            }
-        }
-    }
-}
-
-document.getElementById('refreshMicBtn').addEventListener('click', () => populateMicrophones(true));
-
-// Setup recording
-// Setup recording
-async function toggleRecording() {
+   async function toggleRecording() {
     const recBtn = document.getElementById('recBtn');
     const recIndicator = document.getElementById('recIndicator');
     const micSelect = document.getElementById('micSelect');
+    const modeSelect = document.getElementById('modeSelect');
     
     if (isRecording) {
         stopRecording();
     } else {
+        const mode = modeSelect.value;
         const deviceId = micSelect.value;
         const constraints = {
             audio: {
@@ -549,57 +546,80 @@ async function toggleRecording() {
             }
         };
 
+        hideError();
+        audioChunks = [];
+        currentAudioBlob = null;
+        finalTranscript = '';
+        interimTranscript = '';
+        document.getElementById('transcriptionDisplay').innerHTML = '';
+        
         try {
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
-
-            // Re-init recognition cleanly
-            updateSpeechStatus('starting', '音声認識エンジン起動中...');
-            recognition = initSpeechRecognition();
-            if (recognition) {
+            let stream = null;
+            
+            // 1. Audio Recording setup (if NOT transcription only)
+            if (mode === 'both' || mode === 'record') {
                 try {
-                    lastStartTimestamp = Date.now();
-                    recognition.start();
-                } catch(e) {
-                    console.error("Failed to start recognition:", e);
-                }
-            } else {
-                updateSpeechStatus('unsupported', '非対応ブラウザ（録音のみ）');
-                console.warn("Speech recognition is not supported in this browser. Audio recording will continue without live transcription.");
-                const errDisp = document.getElementById('sysErrorArea');
-                const errText = document.getElementById('sysErrorText');
-                if (errDisp && errText) {
-                    errDisp.classList.remove('hidden');
-                    errText.innerHTML = '<strong>【お知らせ】</strong>お使いのブラウザはリアルタイム文字起こし（Web Speech API）に対応していないため、<strong>音声の録音と手動メモ機能のみ</strong>が利用可能です。文字起こしを使用するには、PCの <strong>Chrome</strong> または <strong>Edge</strong> をご使用ください。';
+                    stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    
+                    const mimeType = getSupportedMimeType();
+                    const options = mimeType ? { mimeType } : {};
+                    console.log("Initializing MediaRecorder with mimeType:", mimeType || "default");
+                    mediaRecorder = new MediaRecorder(stream, options);
+                    
+                    mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) audioChunks.push(e.data);
+                    };
+                    
+                    mediaRecorder.onstop = async () => {
+                        const actualMimeType = mediaRecorder.mimeType || 'audio/webm';
+                        currentAudioBlob = new Blob(audioChunks, { type: actualMimeType });
+                        document.getElementById('downloadAudioBtn').disabled = false;
+                        
+                        await promptAndSaveSession(); 
+                    };
+                    
+                    mediaRecorder.start(1000);
+                } catch (err) {
+                    console.error("Audio recording hardware capture failed:", err);
+                    if (mode === 'record') {
+                        // If only recording, this is fatal!
+                        throw err;
+                    } else {
+                        // If 'both' mode, we fall back to transcription only and warn the user
+                        const errDisp = document.getElementById('sysErrorArea');
+                        const errText = document.getElementById('sysErrorText');
+                        if (errDisp && errText) {
+                            errDisp.classList.remove('hidden');
+                            errText.innerHTML = '<strong>【注意】マイクの競合・接続エラー</strong><br>音声ファイルの録音開始に失敗しました。<strong>文字起こし専用モードに自動フォールバックして継続します。</strong>';
+                        }
+                    }
                 }
             }
             
-            hideError();
+            // 2. Speech Recognition setup (if NOT recording only)
+            if (mode === 'both' || mode === 'transcribe') {
+                updateSpeechStatus('starting', '音声認識エンジン起動中...');
+                recognition = initSpeechRecognition();
+                if (recognition) {
+                    try {
+                        lastStartTimestamp = Date.now();
+                        recognition.start();
+                    } catch(e) {
+                        console.error("Failed to start recognition:", e);
+                    }
+                } else {
+                    updateSpeechStatus('unsupported', '非対応ブラウザ（録音のみ）');
+                    const errDisp = document.getElementById('sysErrorArea');
+                    const errText = document.getElementById('sysErrorText');
+                    if (errDisp && errText) {
+                        errDisp.classList.remove('hidden');
+                        errText.innerHTML = '<strong>【お知らせ】</strong>お使いのブラウザはリアルタイム文字起こし（Web Speech API）に対応していないため、<strong>音声の録音と手動メモ機能のみ</strong>が利用可能です。';
+                    }
+                }
+            } else {
+                updateSpeechStatus('inactive', '文字起こしOFF');
+            }
             
-            audioChunks = [];
-            currentAudioBlob = null;
-            finalTranscript = '';
-            interimTranscript = '';
-            document.getElementById('transcriptionDisplay').innerHTML = '';
-            
-            // Dynamic MIME type selection to prevent crashes in Safari/Firefox
-            const mimeType = getSupportedMimeType();
-            const options = mimeType ? { mimeType } : {};
-            console.log("Initializing MediaRecorder with mimeType:", mimeType || "default");
-            mediaRecorder = new MediaRecorder(stream, options);
-            
-            mediaRecorder.ondataavailable = (e) => {
-                if (e.data.size > 0) audioChunks.push(e.data);
-            };
-            
-            mediaRecorder.onstop = async () => {
-                const actualMimeType = mediaRecorder.mimeType || 'audio/webm';
-                currentAudioBlob = new Blob(audioChunks, { type: actualMimeType });
-                document.getElementById('downloadAudioBtn').disabled = false;
-                
-                await promptAndSaveSession(); 
-            };
-            
-            mediaRecorder.start(1000);
             isRecording = true;
             await requestWakeLock();
             
@@ -612,6 +632,7 @@ async function toggleRecording() {
             
             safeCreateIcons();
             micSelect.disabled = true;
+            modeSelect.disabled = true;
             
             startTime = Date.now();
             timerInterval = setInterval(() => {
@@ -621,7 +642,7 @@ async function toggleRecording() {
             updateTranscriptionUI();
 
         } catch (e) {
-            console.error("Media error:", e);
+            console.error("Media initialization error:", e);
             const errDisp = document.getElementById('sysErrorArea');
             const errText = document.getElementById('sysErrorText');
             if (errDisp && errText) {
@@ -635,9 +656,10 @@ async function toggleRecording() {
                     }
                     showMicPermissionModal();
                 } else {
-                    errText.innerText = `録音の開始に失敗しました: ${e.message}\nマイクの設定を確認してください。`;
+                    errText.innerText = `録音・文字起こしの開始に失敗しました: ${e.message}\nマイクの設定を確認してください。`;
                 }
             }
+            updateSpeechStatus('error', 'エラー');
         }
     }
 }
@@ -676,7 +698,14 @@ function stopRecording() {
     
     safeCreateIcons();
     document.getElementById('micSelect').disabled = false;
-}
+    document.getElementById('modeSelect').disabled = false;
+    
+    // Save prompt for transcription-only mode (since no MediaRecorder onstop is triggered)
+    const modeSelect = document.getElementById('modeSelect');
+    if (modeSelect && modeSelect.value === 'transcribe') {
+        promptAndSaveSession();
+    }
+}    
 
 // Data flow using custom async prompt modal
 async function promptAndSaveSession() {
