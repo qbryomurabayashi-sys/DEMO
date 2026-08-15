@@ -1,11 +1,34 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap');
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
-
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap');
 
 @theme {
   --font-sans: "Outfit", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* QB HOUSE brand accents */
+  --color-brand-cyan: #00a7ea;
+  --color-brand-blue: #0072ce;
+  --color-brand-navy: #0a1a3d;
+
+  /* --- QB re-map: slate palette shifted toward deep navy --- */
+  --color-slate-950: #040e26;
+  --color-slate-900: #0a1a3d;
+  --color-slate-800: #16294d;
+  --color-slate-700: #24395f;
+  --color-slate-600: #3a4d72;
+  --color-slate-500: #6b7ea3;
+  --color-slate-400: #9fb0cf;
+  --color-slate-300: #c3cfe4;
+  --color-slate-200: #e2e9f5;
+  --color-slate-100: #f1f5fc;
+
+  /* --- QB re-map: blue palette -> QB cyan/blue --- */
+  --color-blue-400: #3cc0f0;
+  --color-blue-500: #00a7ea;
+  --color-blue-600: #0084d6;
+  --color-blue-700: #0068b3;
+  --color-blue-900: #06234a;
 }
 
 /* Mobile Adjustments */
@@ -15,16 +38,16 @@
     height: 100vh;
     height: -webkit-fill-available;
   }
-  
+
   #leftSection, #rightSection {
     height: 100%;
     overflow-y: auto;
   }
-  
+
   header {
     flex-shrink: 0;
   }
-  
+
   main {
     flex-shrink: 1;
     min-height: 0;
@@ -67,39 +90,11 @@
   background: rgba(148, 163, 184, 0.4);
 }
 
-/* Premium Modal Animations */
-div[id$="Modal"] {
-  transition: opacity 250ms ease-out;
-  opacity: 0;
+/* Toast entrance */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
-div[id$="Modal"]:not(.hidden) {
-  opacity: 1;
-}
-
-div[id$="Modal"] > div {
-  transition: transform 250ms cubic-bezier(0.16, 1, 0.3, 1), opacity 250ms ease-out;
-  transform: scale(0.95);
-  opacity: 0;
-}
-
-div[id$="Modal"]:not(.hidden) > div {
-  transform: scale(1);
-  opacity: 1;
-}
-
-/* Modal Open Helper */
-.modal-active {
-  overflow: hidden;
-}
-
-/* Warning & Guidance box highlights */
-#iframeWarningBox {
-  animation: pulse-border 2.5s infinite;
-}
-
-@keyframes pulse-border {
-  0% { border-color: rgba(245, 158, 11, 0.2); }
-  50% { border-color: rgba(245, 158, 11, 0.5); }
-  100% { border-color: rgba(245, 158, 11, 0.2); }
+.toast-item {
+  animation: toast-in 0.25s cubic-bezier(0.215, 0.61, 0.355, 1);
 }

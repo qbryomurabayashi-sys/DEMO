@@ -14,7 +14,7 @@ dbReq.onsuccess = (e) => {
 };
 dbReq.onerror = (e) => {
     console.error("Database failed to open:", e.target.error);
-    alert("データベースの初期化に失敗しました。プライベートブラウジングモードなど、履歴の保存に制限がある可能性があります。履歴への保存機能は無効になります。");
+    showToast("履歴の保存機能を初期化できませんでした。プライベートブラウジング等で保存が制限されている可能性があります。", 'error', 6000);
 };
 
 // Help helper to update session text in background
@@ -46,188 +46,6 @@ let timerInterval = null;
 let startTime = null;
 let chunkInterval = null;
 let lastTranscribedTime = 0;
-let lastStartTimestamp = 0;
-
-function updateSpeechStatus(status, text) {
-    const badge = document.getElementById('speechStatusBadge');
-    const dot = document.getElementById('speechStatusDot');
-    const statusText = document.getElementById('speechStatusText');
-    if (!badge || !dot || !statusText) return;
-    
-    badge.className = "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium transition-all duration-300 border";
-    dot.className = "w-1.5 h-1.5 rounded-full";
-    
-    statusText.innerText = `音声認識: ${text}`;
-    
-    switch (status) {
-        case 'inactive':
-            badge.classList.add('bg-slate-800', 'text-slate-400', 'border-slate-750/80');
-            dot.classList.add('bg-slate-500');
-            break;
-        case 'starting':
-            badge.classList.add('bg-amber-500/10', 'text-amber-400', 'border-amber-500/20');
-            dot.classList.add('bg-amber-500', 'animate-pulse');
-            break;
-        case 'listening':
-            badge.classList.add('bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/20');
-            dot.classList.add('bg-emerald-500', 'animate-pulse');
-            break;
-        case 'processing':
-            badge.classList.add('bg-blue-500/10', 'text-blue-400', 'border-blue-500/20');
-            dot.classList.add('bg-blue-500', 'animate-pulse');
-            break;
-        case 'reconnecting':
-            badge.classList.add('bg-amber-500/10', 'text-amber-400', 'border-amber-500/20');
-            dot.classList.add('bg-amber-500', 'animate-pulse');
-            break;
-        case 'error':
-        case 'unsupported':
-            badge.classList.add('bg-red-500/10', 'text-red-400', 'border-red-500/20');
-            dot.classList.add('bg-red-500');
-            break;
-    }
-}
-
-// Dynamic check for browser audio formats to prevent Safari/iOS crashes
-function getSupportedMimeType() {
-    const types = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/ogg;codecs=opus',
-        'audio/ogg',
-        'audio/mp4',
-        'audio/aac',
-        'audio/wav'
-    ];
-    for (const type of types) {
-        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(type)) {
-            return type;
-        }
-    }
-    return ''; // Fallback to browser default
-}
-
-// Reusable custom async confirm modal
-function customConfirm(title, message, isDangerous = false) {
-    return new Promise((resolve) => {
-        const modal = document.getElementById('customConfirmModal');
-        const titleEl = document.getElementById('confirmTitle');
-        const messageEl = document.getElementById('confirmMessage');
-        const confirmBtn = document.getElementById('confirmConfirmBtn');
-        const cancelBtn = document.getElementById('cancelConfirmBtn');
-        const iconBox = document.getElementById('confirmIconBox');
-        
-        titleEl.innerText = title;
-        messageEl.innerHTML = message.replace(/\n/g, '<br>');
-        
-        if (isDangerous) {
-            confirmBtn.className = "px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-bold transition shadow-lg shadow-red-900/40";
-            iconBox.className = "bg-red-500/10 p-2.5 rounded-xl border border-red-500/20 text-red-500";
-        } else {
-            confirmBtn.className = "px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition shadow-lg shadow-blue-900/40";
-            iconBox.className = "bg-blue-500/10 p-2.5 rounded-xl border border-blue-500/20 text-blue-500";
-        }
-        
-        document.body.classList.add('modal-active');
-        modal.classList.remove('hidden');
-        safeCreateIcons();
-        
-        const onConfirm = () => {
-            cleanup();
-            resolve(true);
-        };
-        const onCancel = () => {
-            cleanup();
-            resolve(false);
-        };
-        
-        function cleanup() {
-            confirmBtn.removeEventListener('click', onConfirm);
-            cancelBtn.removeEventListener('click', onCancel);
-            modal.classList.add('hidden');
-            document.body.classList.remove('modal-active');
-        }
-        
-        confirmBtn.addEventListener('click', onConfirm);
-        cancelBtn.addEventListener('click', onCancel);
-    });
-}
-
-// Generic custom async prompt modal for title inputs
-function customPrompt(heading, labelText, defaultVal) {
-    return new Promise((resolve) => {
-        const modal = document.getElementById('saveSessionModal');
-        const titleEl = modal.querySelector('h3');
-        const labelEl = modal.querySelector('label');
-        const input = document.getElementById('sessionTitleInput');
-        const confirmBtn = document.getElementById('confirmSaveBtn');
-        const cancelBtn = document.getElementById('cancelSaveBtn');
-        
-        titleEl.innerText = heading;
-        labelEl.innerText = labelText;
-        input.value = defaultVal;
-        
-        document.body.classList.add('modal-active');
-        modal.classList.remove('hidden');
-        input.focus();
-        input.select();
-        
-        const onConfirm = () => {
-            const val = input.value.trim();
-            cleanup();
-            resolve(val);
-        };
-        const onCancel = () => {
-            cleanup();
-            resolve(null);
-        };
-        const onKeyPress = (e) => {
-            if (e.key === 'Enter') {
-                onConfirm();
-            }
-        };
-        
-        function cleanup() {
-            confirmBtn.removeEventListener('click', onConfirm);
-            cancelBtn.removeEventListener('click', onCancel);
-            input.removeEventListener('keypress', onKeyPress);
-            modal.classList.add('hidden');
-            document.body.classList.remove('modal-active');
-        }
-        
-        confirmBtn.addEventListener('click', onConfirm);
-        cancelBtn.addEventListener('click', onCancel);
-        input.addEventListener('keypress', onKeyPress);
-    });
-}
-
-// Guidance Modal for Mic permissions
-function showMicPermissionModal() {
-    const modal = document.getElementById('micPermissionModal');
-    const closeBtn = document.getElementById('closePermissionModalBtn');
-    
-    const isIframe = window.self !== window.top;
-    const warningBox = document.getElementById('iframeWarningBox');
-    if (warningBox) {
-        if (isIframe) {
-            warningBox.classList.remove('hidden');
-        } else {
-            warningBox.classList.add('hidden');
-        }
-    }
-    
-    document.body.classList.add('modal-active');
-    modal.classList.remove('hidden');
-    safeCreateIcons();
-    
-    const onClose = () => {
-        modal.classList.add('hidden');
-        document.body.classList.remove('modal-active');
-        closeBtn.removeEventListener('click', onClose);
-    };
-    
-    closeBtn.addEventListener('click', onClose);
-}
 
 // Initialize Lucide Icons globally for static HTML
 function safeCreateIcons() {
@@ -240,6 +58,107 @@ function safeCreateIcons() {
     }
 }
 safeCreateIcons();
+
+// ---- UI helpers: Toast / Confirm / Prompt (replaces native alert/confirm/prompt) ----
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[m]));
+}
+
+function showToast(message, type = 'info', duration = 3200) {
+    const container = document.getElementById('toastContainer');
+    if (!container) { console.log(`[toast:${type}] ${message}`); return; }
+    const palette = {
+        info:    { border: 'border-slate-600',        icon: 'info',          color: 'text-brand-cyan' },
+        success: { border: 'border-emerald-600/50',   icon: 'check-circle',  color: 'text-emerald-400' },
+        error:   { border: 'border-red-600/60',       icon: 'alert-triangle', color: 'text-red-400' },
+        warning: { border: 'border-amber-500/60',     icon: 'alert-circle',  color: 'text-amber-400' },
+    };
+    const p = palette[type] || palette.info;
+    const el = document.createElement('div');
+    el.className = `toast-item pointer-events-auto w-full bg-slate-800 border ${p.border} text-slate-100 text-sm rounded-xl px-4 py-3 shadow-2xl flex items-start gap-3`;
+    el.innerHTML = `<i data-lucide="${p.icon}" class="w-5 h-5 shrink-0 ${p.color} mt-0.5"></i><span class="leading-relaxed">${escapeHtml(message)}</span>`;
+    container.appendChild(el);
+    safeCreateIcons();
+    setTimeout(() => {
+        el.style.transition = 'opacity .3s, transform .3s';
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(-12px)';
+        setTimeout(() => el.remove(), 300);
+    }, duration);
+}
+
+function showConfirm(message, { title = '確認', okText = 'OK', cancelText = 'キャンセル', danger = false } = {}) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirmModal');
+        if (!modal) { resolve(window.confirm(message)); return; }
+        const okBtn = document.getElementById('confirmOkBtn');
+        const cancelBtn = document.getElementById('confirmCancelBtn');
+        const iconWrap = document.getElementById('confirmIcon');
+        document.getElementById('confirmTitle').innerText = title;
+        document.getElementById('confirmMessage').innerText = message;
+        okBtn.innerText = okText;
+        cancelBtn.innerText = cancelText;
+        okBtn.className = `px-5 py-2.5 text-sm font-bold text-white rounded-lg transition min-h-11 ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-brand-blue hover:brightness-110'}`;
+        iconWrap.className = `p-2.5 rounded-xl shrink-0 ${danger ? 'bg-red-500/15 text-red-400' : 'bg-brand-cyan/15 text-brand-cyan'}`;
+        iconWrap.innerHTML = `<i data-lucide="${danger ? 'alert-triangle' : 'help-circle'}" class="w-6 h-6"></i>`;
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        safeCreateIcons();
+
+        const cleanup = (result) => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+            modal.removeEventListener('click', onBackdrop);
+            resolve(result);
+        };
+        const onOk = () => cleanup(true);
+        const onCancel = () => cleanup(false);
+        const onBackdrop = (e) => { if (e.target === modal) cleanup(false); };
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        modal.addEventListener('click', onBackdrop);
+    });
+}
+
+function showPrompt(message, defaultValue = '', { title = '入力', okText = '保存' } = {}) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('promptModal');
+        if (!modal) { resolve(window.prompt(message, defaultValue)); return; }
+        const input = document.getElementById('promptInput');
+        const okBtn = document.getElementById('promptOkBtn');
+        const cancelBtn = document.getElementById('promptCancelBtn');
+        document.getElementById('promptTitle').innerText = title;
+        document.getElementById('promptMessage').innerText = message;
+        okBtn.innerText = okText;
+        input.value = defaultValue;
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => { input.focus(); input.select(); }, 50);
+
+        const cleanup = (result) => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+            input.removeEventListener('keydown', onKey);
+            modal.removeEventListener('click', onBackdrop);
+            resolve(result);
+        };
+        const onOk = () => cleanup(input.value);
+        const onCancel = () => cleanup(null);
+        const onKey = (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); onOk(); }
+            else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+        };
+        const onBackdrop = (e) => { if (e.target === modal) cleanup(null); };
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        input.addEventListener('keydown', onKey);
+        modal.addEventListener('click', onBackdrop);
+    });
+}
 
 // Ensure error display is hidden when starting
 function hideError() {
@@ -264,11 +183,11 @@ async function releaseWakeLock() {
     }
 }
 
-// Ensure Web Speech API is maximally optimized and resilient
+// Ensure Web Speech API is maximally optimized
 function initSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-        updateSpeechStatus('unsupported', '非対応ブラウザ');
+        showToast("お使いのブラウザは音声認識に対応していません。Chrome または Edge をご利用ください。", 'error', 6000);
         return null;
     }
     const rec = new SpeechRecognition();
@@ -284,10 +203,7 @@ function initSpeechRecognition() {
         speechStallTimeout = setTimeout(() => {
             if (isRecording && rec) {
                 console.log("Speech recognition appears stalled. Forcing restart...");
-                try {
-                    updateSpeechStatus('reconnecting', '無音検出による再起動中');
-                    rec.stop();
-                } catch(e){}
+                try { rec.stop(); } catch(e){}
             }
         }, 15000); // 15 seconds of absolute silence triggers a restart
     }
@@ -299,34 +215,19 @@ function initSpeechRecognition() {
         interimTranscript = "(音声を聞き取っています...)";
         updateTranscriptionUI();
         resetStallTimeout();
-        updateSpeechStatus('listening', '聞き取り中');
     };
 
     rec.onaudiostart = () => console.log('Audio capturing started');
-    rec.onsoundstart = () => {
-        console.log('Sound started');
-        updateSpeechStatus('listening', '音声を検出中');
-    };
-    rec.onspeechstart = () => {
-        console.log('Speech started');
-        updateSpeechStatus('processing', '解析中');
-    };
-    rec.onspeechend = () => {
-        console.log('Speech ended');
-        updateSpeechStatus('listening', '解析完了・次の発話待ち');
-    };
-    rec.onsoundend = () => {
-        console.log('Sound ended');
-        resetStallTimeout();
-        updateSpeechStatus('listening', '静音中');
-    };
+    rec.onsoundstart = () => console.log('Sound started');
+    rec.onspeechstart = () => console.log('Speech started');
+    rec.onspeechend = () => console.log('Speech ended');
+    rec.onsoundend = () => { console.log('Sound ended'); resetStallTimeout(); };
     rec.onaudioend = () => console.log('Audio capturing ended');
     rec.onnomatch = () => console.log('No match');
 
     rec.onresult = (event) => {
         resetStallTimeout();
         console.log("Speech recognition result received", event.results);
-        updateSpeechStatus('processing', '文字変換中');
         let interim = '';
         const currentTimeParts = getFormattedTime(Date.now() - startTime);
 
@@ -355,58 +256,35 @@ function initSpeechRecognition() {
 
         const errDisp = document.getElementById('sysErrorArea');
         const errText = document.getElementById('sysErrorText');
-        
-        if (event.error === 'not-allowed') {
-            // Permission denied: fatal. Stop recording, show guidance modal
-            updateSpeechStatus('error', 'マイク権限エラー');
-            if (errDisp && errText) {
-                errDisp.classList.remove('hidden');
+        if (errDisp && errText) {
+            errDisp.classList.remove('hidden');
+            if (event.error === 'not-allowed') {
                 const isIframe = window.self !== window.top;
                 if (isIframe) {
                     errText.innerHTML = '<strong>【重要】マイクへのアクセス拒否について</strong><br>現在はプレビュー画面で実行されているため、ブラウザのセキュリティ制限によりマイクがブロックされています。<br><strong>右上の「新しいタブで開く」アイコンから起動し直してください。</strong>';
                 } else {
                     errText.innerText = "マイクへのアクセスが拒否されました。ブラウザの設定でマイクを「許可」してリロードしてください。";
                 }
+            } else if (event.error === 'network') {
+                errText.innerText = "ネットワークエラーのため文字起こしが停止しました。";
+            } else {
+                errText.innerText = "音声認識エラー: " + event.error;
             }
-            showMicPermissionModal();
-            stopRecording();
-        } else if (event.error === 'network') {
-            // Network error: NON-FATAL! Do NOT stop mediaRecorder, just alert visually and let onend restart it
-            console.warn("Speech recognition network error. Keep recording. SpeechRecognition will restart.");
-            updateSpeechStatus('reconnecting', '再接続中(ネットワークエラー)');
-            interimTranscript = "(ネットワーク一時接続切れ - 文字起こし自動再接続中...)";
-            updateTranscriptionUI();
-        } else {
-            // Other errors: NON-FATAL. Do NOT stop mediaRecorder.
-            console.warn("Non-fatal speech recognition error: " + event.error + ". Keep recording.");
-            updateSpeechStatus('reconnecting', `再接続中(${event.error})`);
-            interimTranscript = `(音声認識が一時的に利用不可: ${event.error} - 録音は継続中...)`;
-            updateTranscriptionUI();
         }
+        stopRecording();
     };
 
     rec.onend = () => {
-        // Keep restarting speech recognition as long as isRecording is true
+        // Critical for transcription accuracy: keep restarting as long as we are meant to be recording!
         if (isRecording) {
-            console.log("Speech recognition ended. Attempting throttled automatic restart...");
-            const now = Date.now();
-            const elapsed = now - lastStartTimestamp;
-            // Limit restarts to once every 3.5 seconds to prevent rate-limit loop freeze
-            const delay = elapsed < 3500 ? 3500 - elapsed : 500;
-            
-            setTimeout(() => {
-                if (isRecording) {
-                    try {
-                        console.log("Throttled SpeechRecognition restart triggered");
-                        lastStartTimestamp = Date.now();
-                        rec.start();
-                    } catch (e) {
-                        console.error("Failed to restart recognition:", e);
-                    }
-                }
-            }, delay);
-        } else {
-            updateSpeechStatus('inactive', '待機中');
+            interimTranscript = "(認識リセット中...)";
+            updateTranscriptionUI();
+            try {
+                rec.start();
+            } catch (e) {
+                console.error("Failed to restart recognition:", e);
+                setTimeout(() => { if (isRecording) rec.start(); }, 500); // Backoff retry
+            }
         }
     };
 
@@ -530,7 +408,6 @@ async function populateMicrophones(requestPermission = false) {
 document.getElementById('refreshMicBtn').addEventListener('click', () => populateMicrophones(true));
 
 // Setup recording
-// Setup recording
 async function toggleRecording() {
     const recBtn = document.getElementById('recBtn');
     const recIndicator = document.getElementById('recIndicator');
@@ -553,24 +430,13 @@ async function toggleRecording() {
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
             // Re-init recognition cleanly
-            updateSpeechStatus('starting', '音声認識エンジン起動中...');
             recognition = initSpeechRecognition();
-            if (recognition) {
-                try {
-                    lastStartTimestamp = Date.now();
-                    recognition.start();
-                } catch(e) {
-                    console.error("Failed to start recognition:", e);
-                }
-            } else {
-                updateSpeechStatus('unsupported', '非対応ブラウザ（録音のみ）');
-                console.warn("Speech recognition is not supported in this browser. Audio recording will continue without live transcription.");
-                const errDisp = document.getElementById('sysErrorArea');
-                const errText = document.getElementById('sysErrorText');
-                if (errDisp && errText) {
-                    errDisp.classList.remove('hidden');
-                    errText.innerHTML = '<strong>【お知らせ】</strong>お使いのブラウザはリアルタイム文字起こし（Web Speech API）に対応していないため、<strong>音声の録音と手動メモ機能のみ</strong>が利用可能です。文字起こしを使用するには、PCの <strong>Chrome</strong> または <strong>Edge</strong> をご使用ください。';
-                }
+            if(!recognition) return;
+            
+            try {
+                recognition.start();
+            } catch(e) {
+                console.error("Failed to start recognition:", e);
             }
             
             hideError();
@@ -581,22 +447,18 @@ async function toggleRecording() {
             interimTranscript = '';
             document.getElementById('transcriptionDisplay').innerHTML = '';
             
-            // Dynamic MIME type selection to prevent crashes in Safari/Firefox
-            const mimeType = getSupportedMimeType();
-            const options = mimeType ? { mimeType } : {};
-            console.log("Initializing MediaRecorder with mimeType:", mimeType || "default");
-            mediaRecorder = new MediaRecorder(stream, options);
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
             
             mediaRecorder.ondataavailable = (e) => {
                 if (e.data.size > 0) audioChunks.push(e.data);
             };
             
-            mediaRecorder.onstop = async () => {
-                const actualMimeType = mediaRecorder.mimeType || 'audio/webm';
-                currentAudioBlob = new Blob(audioChunks, { type: actualMimeType });
+            mediaRecorder.onstop = () => {
+                const mimeType = mediaRecorder.mimeType || 'audio/webm';
+                currentAudioBlob = new Blob(audioChunks, { type: mimeType });
                 document.getElementById('downloadAudioBtn').disabled = false;
                 
-                await promptAndSaveSession(); 
+                promptAndSaveSession(); 
             };
             
             mediaRecorder.start(1000);
@@ -633,7 +495,6 @@ async function toggleRecording() {
                     } else {
                         errText.innerHTML = "マイクへのアクセスが拒否されました。ブラウザのURLバーにある鍵マーク（設定）から、このサイトでのマイク使用を「許可」にして再読み込みしてください。";
                     }
-                    showMicPermissionModal();
                 } else {
                     errText.innerText = `録音の開始に失敗しました: ${e.message}\nマイクの設定を確認してください。`;
                 }
@@ -656,8 +517,6 @@ function stopRecording() {
         try { recognition.stop(); } catch(e){}
     }
     
-    updateSpeechStatus('inactive', '待機中');
-    
     if (interimTranscript && !interimTranscript.startsWith('(')) {
         finalTranscript += `\n[${document.getElementById('timerDisplay').innerText}] ${interimTranscript}\n`;
     }
@@ -678,16 +537,17 @@ function stopRecording() {
     document.getElementById('micSelect').disabled = false;
 }
 
-// Data flow using custom async prompt modal
+// Data flow
 async function promptAndSaveSession() {
     if (!finalTranscript.trim() && !currentAudioBlob) return;
-    
+
     const defaultTitle = new Date().toLocaleString() + " の会議";
-    const userTitle = await customPrompt("セッションの保存", "会議のタイトル", defaultTitle);
-    
-    if (userTitle !== null && userTitle.trim() !== "") {
-        saveSessionToDB(userTitle.trim());
+    const userTitle = await showPrompt("セッションのタイトルを入力して保存します。", defaultTitle, { title: "録音を終了しました", okText: "保存" });
+
+    if (userTitle !== null) {
+        saveSessionToDB(userTitle.trim() || defaultTitle);
     } else {
+        // Save with default if cancelled to prevent data loss
         saveSessionToDB(defaultTitle + " (自動保存)");
     }
 }
@@ -711,10 +571,11 @@ function saveSessionToDB(title) {
     req.onsuccess = (e) => {
         currentSessionId = e.target.result; // Update Current Session Tracking
         loadHistory();
+        showToast("セッションを保存しました。", 'success');
     };
     req.onerror = (e) => {
         console.error("Save failed", e);
-        alert("セッションの保存に失敗しました。ストレージ容量を確認してください。");
+        showToast("セッションの保存に失敗しました。ストレージ容量をご確認ください。", 'error', 6000);
     };
 }
 
@@ -747,20 +608,19 @@ function loadHistory() {
             const timeStr = new Date(session.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             
             const item = document.createElement('div');
-            item.className = `p-3 rounded-lg border cursor-pointer hover:bg-slate-800 transition group mb-2 ${currentSessionId === session.id ? 'border-blue-500 bg-blue-900/20' : 'border-slate-800 bg-slate-900/40'}`;
-            
+            item.className = `p-3 rounded-xl border transition group mb-2 ${currentSessionId === session.id ? 'border-brand-cyan bg-brand-cyan/10' : 'border-slate-800 bg-slate-900/40'}`;
+
             item.innerHTML = `
-                <div class="flex justify-between items-start mb-1">
-                    <h4 class="font-bold text-slate-200 text-sm truncate pr-2 group-hover:text-blue-400 transition" 
-                        onclick="loadSpecificSession(${session.id})" title="${session.title}">${session.title}</h4>
-                </div>
-                <div class="flex justify-between items-center text-[10px] text-slate-500">
+                <button class="load-session-btn w-full text-left mb-2" data-id="${session.id}" title="${escapeHtml(session.title)}">
+                    <h4 class="font-bold text-slate-100 text-sm truncate group-hover:text-brand-cyan transition">${escapeHtml(session.title)}</h4>
+                </button>
+                <div class="flex justify-between items-center text-xs text-slate-400">
                     <span>${dateStr} ${timeStr}</span>
-                    <div class="flex gap-2">
-                        <button class="edit-session-btn p-1.5 text-slate-300 hover:text-emerald-400 bg-slate-800 hover:bg-slate-700 rounded transition border border-slate-700" data-id="${session.id}" title="タイトル編集">
+                    <div class="flex gap-1.5">
+                        <button class="edit-session-btn p-2 text-slate-300 hover:text-emerald-400 bg-slate-800 hover:bg-slate-700 rounded-lg transition border border-slate-700 min-w-10 min-h-10 flex items-center justify-center" data-id="${session.id}" title="タイトルを編集">
                             <i data-lucide="edit-2" class="w-4 h-4"></i>
                         </button>
-                        <button class="delete-session-btn p-1.5 text-slate-300 hover:text-red-400 bg-slate-800 hover:bg-slate-700 rounded transition border border-slate-700" data-id="${session.id}" title="このセッションを削除">
+                        <button class="delete-session-btn p-2 text-slate-300 hover:text-red-400 bg-slate-800 hover:bg-slate-700 rounded-lg transition border border-slate-700 min-w-10 min-h-10 flex items-center justify-center" data-id="${session.id}" title="このセッションを削除">
                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                         </button>
                     </div>
@@ -768,15 +628,22 @@ function loadHistory() {
             `;
             list.appendChild(item);
         });
-        
-        // Setup listeners for edit/delete
+
+        // Setup listeners for load/edit/delete
+        document.querySelectorAll('.load-session-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                loadSpecificSession(parseInt(btn.getAttribute('data-id')));
+                if (window.matchMedia('(max-width: 1023px)').matches) closeSidebar();
+            });
+        });
+
         document.querySelectorAll('.edit-session-btn').forEach(btn => {
             btn.addEventListener('click', (ev) => {
                 ev.stopPropagation();
                 editSessionTitle(parseInt(btn.getAttribute('data-id')));
             });
         });
-        
+
         document.querySelectorAll('.delete-session-btn').forEach(btn => {
             btn.addEventListener('click', (ev) => {
                 ev.stopPropagation();
@@ -799,7 +666,7 @@ window.loadSpecificSession = function(id) {
     
     // Prevent accidental load while recording
     if (isRecording) {
-        alert("録音中はセッションの切り替えができません。");
+        showToast("録音中はセッションを切り替えできません。", 'warning');
         return;
     }
     
@@ -832,26 +699,22 @@ function editSessionTitle(id) {
     store.get(id).onsuccess = async (e) => {
         const session = e.target.result;
         if (!session) return;
-        
-        const newTitle = await customPrompt("タイトルの編集", "新しいタイトル", session.title);
+
+        const newTitle = await showPrompt("新しいタイトルを入力してください。", session.title, { title: "タイトルを編集", okText: "更新" });
         if (newTitle && newTitle.trim() !== "") {
             session.title = newTitle.trim();
             const wTx = db.transaction('sessions', 'readwrite');
             wTx.objectStore('sessions').put(session).onsuccess = () => {
-                loadHistory(); 
+                loadHistory();
+                showToast("タイトルを更新しました。", 'success');
             };
         }
     };
 }
 
 async function deleteSession(id) {
-    const confirmed = await customConfirm(
-        "セッションの削除",
-        "この保存済みセッションを削除しますか？\n(削除したデータは元に戻すことはできません)",
-        true
-    );
-    
-    if(confirmed) {
+    const ok = await showConfirm("この保存済みセッションを削除しますか？\n元に戻すことはできません。", { title: "セッションを削除", okText: "削除する", danger: true });
+    if (ok) {
         const tx = db.transaction('sessions', 'readwrite');
         tx.objectStore('sessions').delete(id).onsuccess = () => {
             if (currentSessionId === id) {
@@ -865,41 +728,28 @@ async function deleteSession(id) {
                 document.getElementById('downloadTransBtn').disabled = true;
             }
             loadHistory();
+            showToast("セッションを削除しました。", 'info');
         };
     }
 }
 
 // Global UI Handlers
 document.addEventListener('DOMContentLoaded', () => {
-    // Check for local file protocol security restriction
-    if (window.location.protocol === 'file:') {
-        updateSpeechStatus('error', '制限（ローカル起動）');
-        const errDisp = document.getElementById('sysErrorArea');
-        const errText = document.getElementById('sysErrorText');
-        if (errDisp && errText) {
-            errDisp.classList.remove('hidden');
-            errText.innerHTML = '<strong>【制限】ローカルファイル（file://）として直接開かれています</strong><br>ブラウザのセキュリティ制限により、このファイルダブルクリック起動方法では音声の録音や文字起こしが正常に動作しません。<br><strong>本製品を使用するには、Viteの開発サーバーを起動するか、ローカルWEBサーバー経由でアクセスしてください。</strong>';
-        }
-    } else {
-        populateMicrophones(false);
-    }
+    populateMicrophones(false);
 
     document.getElementById('recBtn').addEventListener('click', toggleRecording);
     
     // Buttons
     document.getElementById('clearDataBtn').addEventListener('click', async () => {
-        const confirmed = await customConfirm(
-            "表示のクリア",
-            "画面上のテキストと直近の音声を消去しますか？\n※履歴に保存済みのデータは削除されません。",
-            false
-        );
-        if(confirmed) {
+        const ok = await showConfirm("画面上のテキストと直近の音声を消去しますか？\n履歴に保存済みのデータは削除されません。", { title: "画面を消去", okText: "消去する", danger: true });
+        if (ok) {
             finalTranscript = '';
             interimTranscript = '';
             currentAudioBlob = null;
             currentSessionId = null;
             updateTranscriptionUI();
             loadHistory();
+            showToast("画面を消去しました。", 'info');
         }
     });
 
@@ -948,15 +798,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // New Session Button binding
     document.getElementById('newSessionBtn').addEventListener('click', async () => {
         if (isRecording) {
-            alert("録音中は新規セッションに切り替えることはできません。");
+            showToast("録音中は新規セッションに切り替えできません。", 'warning');
             return;
         }
-        const confirmed = await customConfirm(
-            "新規セッションの開始",
-            "現在の画面表示をリセットし、新しい文字起こしセッションを開始しますか？\n（すでに履歴に保存されているデータは消えません）",
-            false
-        );
-        if (confirmed) {
+        const ok = await showConfirm("現在の画面表示をリセットして、新しい文字起こしセッションを開始しますか？\n履歴に保存済みのデータは消えません。", { title: "新規セッション", okText: "開始する" });
+        if (ok) {
             finalTranscript = '';
             interimTranscript = '';
             currentAudioBlob = null;
@@ -964,6 +810,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateTranscriptionUI();
             loadHistory();
             document.getElementById('timerDisplay').innerText = "00:00:00";
+            closeSidebar();
         }
     });
     
@@ -988,16 +835,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Sidebar toggle for mobile
     const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
     const closeSidebarBtn = document.getElementById('closeSidebarBtn');
-    const sidebar = document.getElementById('sidebar');
 
-    toggleSidebarBtn?.addEventListener('click', () => {
-        sidebar.classList.remove('-translate-x-full');
-    });
-
-    closeSidebarBtn?.addEventListener('click', () => {
-        sidebar.classList.add('-translate-x-full');
-    });
+    toggleSidebarBtn?.addEventListener('click', openSidebar);
+    closeSidebarBtn?.addEventListener('click', closeSidebar);
+    document.getElementById('sidebarOverlay')?.addEventListener('click', closeSidebar);
 });
+
+function openSidebar() {
+    document.getElementById('sidebar')?.classList.remove('-translate-x-full');
+    document.getElementById('sidebarOverlay')?.classList.remove('hidden');
+}
+
+function closeSidebar() {
+    document.getElementById('sidebar')?.classList.add('-translate-x-full');
+    document.getElementById('sidebarOverlay')?.classList.add('hidden');
+}
 
 function executeDownload(content, filename, type) {
     const blob = new Blob([content], { type });
@@ -1026,3 +878,4 @@ window.addEventListener('beforeunload', (e) => {
         return msg;
     }
 });
+

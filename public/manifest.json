@@ -1,11 +1,11 @@
 {
-  "name": "Local AI Meeting Assistant",
-  "short_name": "AI議事録",
-  "description": "WebGPUを使用した完全ローカル完結型のAI議事録・面談要約ツール",
+  "name": "QB議事録アシスタント",
+  "short_name": "QB議事録",
+  "description": "ブラウザ内で完結する録音・文字起こし・議事録メモ（QB HOUSE）",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "background_color": "#0a1a3d",
+  "theme_color": "#0a1a3d",
   "icons": [
     {
       "src": "/manifest-icon-192.maskable.png",

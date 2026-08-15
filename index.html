@@ -2,15 +2,15 @@
 <html lang="ja" translate="no">
   <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ローカルAI議事録アシスタント (WebLLM)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>QB議事録アシスタント</title>
 
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#0f172a">
+    <meta name="theme-color" content="#0a1a3d">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="AI議事録">
+    <meta name="apple-mobile-web-app-title" content="QB議事録">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
 
     <!-- Tailwind CSS & Lucide Icons -->
@@ -24,15 +24,15 @@
         width: 8px;
       }
       .custom-scrollbar::-webkit-scrollbar-track {
-        background: #1e293b;
+        background: #0a1a3d;
         border-radius: 4px;
       }
       .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: #475569;
+        background: #24395f;
         border-radius: 4px;
       }
       .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #64748b;
+        background: #3a4d72;
       }
       .recording-pulse {
         animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
@@ -54,251 +54,197 @@
   </head>
   <body class="bg-slate-900 text-slate-200 min-h-screen flex flex-col font-sans lg:h-screen lg:overflow-hidden">
 
-
-
     <!-- Header -->
-    <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 shrink-0 z-20 shadow-xl">
-      <div class="flex items-center gap-4 w-full md:w-auto">
-        <button id="toggleSidebarBtn" class="p-2 text-slate-400 hover:text-white bg-slate-800 rounded-md lg:hidden">
+    <header class="bg-slate-900 border-b border-slate-800 px-4 sm:px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-3 shrink-0 z-20 shadow-xl">
+      <div class="flex items-center gap-3 w-full md:w-auto">
+        <button id="toggleSidebarBtn" class="p-2.5 text-slate-300 hover:text-white bg-slate-800 rounded-lg lg:hidden min-w-11 min-h-11 flex items-center justify-center" aria-label="履歴を開く">
           <i data-lucide="menu" class="w-5 h-5"></i>
         </button>
         <div class="flex items-center gap-3">
-          <div class="bg-blue-600 p-2 rounded-lg">
+          <div class="bg-gradient-to-br from-brand-cyan to-brand-blue p-2.5 rounded-xl shadow-lg shadow-blue-900/40">
             <i data-lucide="mic-2" class="w-5 h-5 text-white"></i>
           </div>
-          <h1 class="text-xl font-black text-slate-100 tracking-tighter uppercase italic">ローカルAI議事録</h1>
+          <div class="leading-tight">
+            <div class="text-[10px] font-black tracking-[0.25em] text-brand-cyan uppercase">QB HOUSE</div>
+            <h1 class="text-lg font-black text-slate-100 tracking-tight">議事録アシスタント</h1>
+          </div>
         </div>
-
       </div>
 
-      <!-- Centered Global Controls: ALWAYS VISIBLE AND ACCESSIBLE -->
-      <div class="flex items-center bg-slate-950/80 rounded-2xl p-1.5 border border-slate-800 shadow-inner w-full md:w-auto max-w-2xl">
-          <button id="recBtn" class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-black text-sm transition-all active:scale-95 shadow-lg shadow-blue-900/40 whitespace-nowrap">
-            <i data-lucide="mic" class="w-4 h-4"></i> <span id="recBtnText">録音開始</span>
+      <!-- Global Controls: ALWAYS VISIBLE AND ACCESSIBLE -->
+      <div class="flex flex-wrap items-center justify-center bg-slate-950/80 rounded-2xl p-2 gap-2 border border-slate-800 shadow-inner w-full md:w-auto max-w-2xl">
+        <button id="recBtn" class="flex items-center justify-center gap-2 bg-gradient-to-br from-brand-cyan to-brand-blue hover:brightness-110 text-white px-6 py-3 rounded-xl font-black text-base transition-all active:scale-95 shadow-lg shadow-blue-900/40 whitespace-nowrap min-h-12">
+          <i data-lucide="mic" class="w-5 h-5"></i> <span id="recBtnText">録音開始</span>
+        </button>
+
+        <div class="flex items-center gap-3 px-3">
+          <div id="recIndicator" class="w-3 h-3 rounded-full bg-slate-600 transition-all duration-300"></div>
+          <span id="timerDisplay" class="font-mono text-xl font-light text-slate-200 tracking-wider w-[92px]">00:00:00</span>
+        </div>
+
+        <div class="flex items-center gap-1 px-2 min-w-[150px] flex-1 border-l border-slate-800">
+          <i data-lucide="settings-2" class="w-4 h-4 text-slate-500 shrink-0"></i>
+          <select id="micSelect" class="bg-transparent text-slate-300 text-sm py-2 px-1 focus:outline-none w-full truncate">
+            <option value="">システム標準マイク</option>
+          </select>
+          <button id="refreshMicBtn" class="p-2 text-slate-400 hover:text-white transition min-w-10 min-h-10 flex items-center justify-center" title="マイク一覧を更新">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
           </button>
-          
-          <div class="flex items-center gap-4 px-4 border-r border-slate-800 mx-1">
-            <div id="recIndicator" class="w-2.5 h-2.5 rounded-full bg-slate-600 transition-all duration-300"></div>
-            <span id="timerDisplay" class="font-mono text-xl font-light text-slate-200 tracking-wider w-24">00:00:00</span>
-          </div>
-
-          <div class="flex-1 flex items-center gap-2 px-2 min-w-[140px]">
-            <select id="micSelect" class="bg-transparent text-slate-300 text-xs py-1 px-2 focus:outline-none w-full truncate">
-              <option value="">システム標準マイク</option>
-            </select>
-            <button id="refreshMicBtn" class="p-1.5 text-slate-500 hover:text-white transition" title="マイク更新">
-                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-            </button>
-          </div>
-
-
-      <!-- /Center Controls -->
+        </div>
+      </div>
     </header>
 
     <!-- Main Content Container -->
     <div class="flex-1 flex flex-col lg:flex-row lg:overflow-hidden relative">
 
-
-
       <!-- Sidebar: History -->
-      <aside id="sidebar" class="fixed inset-y-0 left-0 w-72 bg-slate-950 border-r border-slate-800 z-30 transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 flex flex-col h-full">
+      <aside id="sidebar" class="fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-slate-950 border-r border-slate-800 z-30 transform -translate-x-full lg:translate-x-0 lg:static lg:w-72 transition-transform duration-300 flex flex-col h-full">
         <div class="p-4 border-b border-slate-800 flex justify-between items-center">
-          <span class="text-xs font-bold text-slate-500 tracking-widest uppercase">保存されたセッション</span>
+          <span class="text-xs font-bold text-slate-400 tracking-widest uppercase">保存されたセッション</span>
           <div class="flex items-center gap-1">
-            <button id="newSessionBtn" class="p-1.5 text-blue-400 hover:bg-blue-900/30 rounded-md transition" title="新規セッション">
-              <i data-lucide="plus-circle" class="w-5 h-5"></i>
+            <button id="newSessionBtn" class="p-2 text-brand-cyan hover:bg-brand-cyan/10 rounded-lg transition min-w-11 min-h-11 flex items-center justify-center" title="新規セッション">
+              <i data-lucide="plus-circle" class="w-6 h-6"></i>
             </button>
-            <button id="closeSidebarBtn" class="p-1.5 text-slate-500 hover:text-white lg:hidden">
-              <i data-lucide="chevron-left" class="w-5 h-5"></i>
+            <button id="closeSidebarBtn" class="p-2 text-slate-400 hover:text-white lg:hidden min-w-11 min-h-11 flex items-center justify-center">
+              <i data-lucide="chevron-left" class="w-6 h-6"></i>
             </button>
           </div>
         </div>
         <div id="historyList" class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-
           <!-- History items will be injected here -->
-          <div class="text-center py-10 text-slate-600 text-xs italic">保存されたデータはありません</div>
+          <div class="text-center py-10 text-slate-500 text-sm italic">保存されたデータはありません</div>
         </div>
         <div class="p-4 border-t border-slate-800 bg-slate-900/50">
-          <div class="flex items-center justify-between text-[10px] text-slate-500 mb-2">
-            <span class="text-xs font-bold text-slate-500 tracking-widest uppercase">ストレージ使用量</span>
+          <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+            <span class="font-bold tracking-widest uppercase">ストレージ使用量</span>
             <span id="storageUsageText">0 MB</span>
           </div>
-          <div class="w-full bg-slate-800 rounded-full h-1 overflow-hidden">
-            <div id="storageUsageBar" class="bg-blue-600 h-full" style="width: 0%"></div>
+          <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+            <div id="storageUsageBar" class="bg-gradient-to-r from-brand-cyan to-brand-blue h-full transition-all" style="width: 0%"></div>
           </div>
         </div>
       </aside>
 
-      <!-- Main Content Split Layout -->
-      <main class="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden bg-slate-950">
-        
-        <!-- Left Section: Transcription -->
-        <section id="leftSection" class="flex-1 flex flex-col border-r border-slate-800 bg-slate-900/40 relative">
-            <div class="px-5 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/80 backdrop-blur-md">
-                <div class="flex items-center gap-3">
-                    <span class="text-xs font-bold text-slate-400 tracking-wider flex items-center gap-2 uppercase">
-                        <i data-lucide="align-left" class="w-4 h-4"></i> 文字起こし
-                    </span>
-                    <!-- Speech Recognition Status Badge -->
-                    <span id="speechStatusBadge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-750/80 transition-all duration-300">
-                        <span class="w-1.5 h-1.5 rounded-full bg-slate-500" id="speechStatusDot"></span>
-                        <span id="speechStatusText">音声認識: 待機中</span>
-                    </span>
-                </div>
-                <div class="flex gap-1">
-                    <button id="downloadTransBtn" class="text-slate-400 hover:text-white p-2 rounded hover:bg-slate-800 transition disabled:opacity-30" title="テキストを保存" disabled>
-                        <i data-lucide="save" class="w-4 h-4"></i>
-                    </button>
-                    <button id="downloadAudioBtn" class="text-slate-400 hover:text-white p-2 rounded hover:bg-slate-800 transition disabled:opacity-30" title="音声保存" disabled>
-                        <i data-lucide="download" class="w-4 h-4"></i>
-                    </button>
-                    <button id="clearDataBtn" class="text-slate-400 hover:text-red-400 p-2 rounded hover:bg-red-900/20 transition" title="消去">
-                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                    </button>
-                </div>
+      <!-- Sidebar overlay (mobile) -->
+      <div id="sidebarOverlay" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-20 hidden lg:hidden"></div>
+
+      <!-- Main Content -->
+      <main class="flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-950">
+
+        <!-- Transcription Section -->
+        <section id="leftSection" class="flex-1 flex flex-col bg-slate-900/40 relative">
+          <div class="px-5 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/80 backdrop-blur-md">
+            <span class="text-sm font-bold text-slate-300 tracking-wider flex items-center gap-2 uppercase">
+              <i data-lucide="align-left" class="w-4 h-4 text-brand-cyan"></i> 文字起こし
+            </span>
+            <div class="flex gap-1">
+              <button id="downloadTransBtn" class="text-slate-300 hover:text-white p-2.5 rounded-lg hover:bg-slate-800 transition disabled:opacity-30 min-w-11 min-h-11 flex items-center justify-center" title="テキストを保存" disabled>
+                <i data-lucide="save" class="w-5 h-5"></i>
+              </button>
+              <button id="downloadAudioBtn" class="text-slate-300 hover:text-white p-2.5 rounded-lg hover:bg-slate-800 transition disabled:opacity-30 min-w-11 min-h-11 flex items-center justify-center" title="音声を保存" disabled>
+                <i data-lucide="download" class="w-5 h-5"></i>
+              </button>
+              <button id="clearDataBtn" class="text-slate-300 hover:text-red-400 p-2.5 rounded-lg hover:bg-red-900/20 transition min-w-11 min-h-11 flex items-center justify-center" title="画面を消去">
+                <i data-lucide="trash-2" class="w-5 h-5"></i>
+              </button>
+            </div>
+          </div>
+
+          <div id="viewTranscription" class="flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-6 pb-28 text-slate-200 leading-relaxed">
+            <!-- Error Area -->
+            <div id="sysErrorArea" class="hidden mb-4 bg-red-900/40 border border-red-800/50 text-red-100 text-sm p-4 rounded-xl flex gap-3 items-start">
+              <i data-lucide="alert-triangle" class="w-5 h-5 shrink-0 mt-0.5"></i><span id="sysErrorText" class="leading-relaxed"></span>
             </div>
 
-            <div id="viewTranscription" class="flex-1 overflow-y-auto custom-scrollbar p-6 pb-24 text-slate-200 leading-relaxed">
-                <!-- Error Area Immersive -->
-                <div id="sysErrorArea" class="hidden mb-4 bg-red-900/40 border border-red-800/50 text-red-100 text-[10px] p-3 rounded-lg flex gap-2 items-center">
-                    <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0"></i><span id="sysErrorText"></span>
-                </div>
-
-                <div id="transcriptionPlaceholder" class="text-slate-600 flex flex-col items-center justify-center h-full opacity-40">
-                  <i data-lucide="activity" class="w-12 h-12 mb-4"></i>
-                  <p class="text-sm font-bold uppercase tracking-widest mb-1">録音準備完了</p>
-                  <p class="text-[10px]">上のボタンから録音を開始してください</p>
-                </div>
-                <div id="transcriptionDisplay" class="whitespace-pre-wrap break-words text-lg"></div>
-                <div id="interimDisplay" class="text-slate-500 italic mt-2 text-lg"></div>
+            <div id="transcriptionPlaceholder" class="text-slate-500 flex flex-col items-center justify-center h-full opacity-50">
+              <i data-lucide="activity" class="w-14 h-14 mb-4"></i>
+              <p class="text-base font-bold uppercase tracking-widest mb-1">録音準備完了</p>
+              <p class="text-sm">上のボタンから録音を開始してください</p>
             </div>
+            <div id="transcriptionDisplay" class="whitespace-pre-wrap break-words text-lg"></div>
+            <div id="interimDisplay" class="text-slate-400 italic mt-2 text-lg"></div>
+          </div>
 
-            <!-- Manual Memo Input Floating -->
-            <div class="absolute bottom-6 left-6 right-6 z-10 transition-transform focus-within:scale-[1.02]">
-                <div class="bg-slate-900/90 backdrop-blur-xl border border-slate-700 p-2 pl-4 rounded-2xl flex items-center gap-2 shadow-2xl shadow-black/50">
-                    <i data-lucide="sticky-note" class="w-4 h-4 text-slate-500"></i>
-                    <textarea id="manualMemoInput" placeholder="重要なメモを追加..." class="flex-1 bg-transparent border-none py-2 text-sm text-slate-200 focus:outline-none resize-none h-10 custom-scrollbar"></textarea>
-                    <button id="addMemoBtn" class="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-xl transition shadow-lg shadow-blue-900/40">
-                        <i data-lucide="plus" class="w-5 h-5"></i>
-                    </button>
-                </div>
+          <!-- Manual Memo Input (Floating) -->
+          <div class="absolute bottom-5 left-5 right-5 z-10 transition-transform focus-within:scale-[1.01]">
+            <div class="bg-slate-900/90 backdrop-blur-xl border border-slate-700 p-2 pl-4 rounded-2xl flex items-center gap-2 shadow-2xl shadow-black/50">
+              <i data-lucide="sticky-note" class="w-5 h-5 text-brand-cyan shrink-0"></i>
+              <textarea id="manualMemoInput" placeholder="重要なメモを追加..." class="flex-1 bg-transparent border-none py-2 text-base text-slate-100 placeholder:text-slate-500 focus:outline-none resize-none h-11 custom-scrollbar"></textarea>
+              <button id="addMemoBtn" class="bg-gradient-to-br from-brand-cyan to-brand-blue hover:brightness-110 text-white p-3 rounded-xl transition shadow-lg shadow-blue-900/40 min-w-12 min-h-12 flex items-center justify-center" title="メモを追加">
+                <i data-lucide="plus" class="w-5 h-5"></i>
+              </button>
             </div>
+          </div>
         </section>
-
 
       </main>
     </div>
 
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-4 left-1/2 -translate-x-1/2 z-[300] flex flex-col items-center gap-2 pointer-events-none w-full max-w-sm px-4"></div>
 
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="fixed inset-0 bg-slate-950/85 z-[250] hidden items-center justify-center p-4 backdrop-blur-sm">
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+        <div class="flex items-start gap-3 mb-4">
+          <div id="confirmIcon" class="p-2.5 rounded-xl bg-brand-cyan/15 text-brand-cyan shrink-0">
+            <i data-lucide="help-circle" class="w-6 h-6"></i>
+          </div>
+          <div class="pt-1">
+            <h3 id="confirmTitle" class="text-lg font-bold text-slate-100 mb-1">確認</h3>
+            <p id="confirmMessage" class="text-slate-300 text-sm leading-relaxed whitespace-pre-line"></p>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3">
+          <button id="confirmCancelBtn" class="px-5 py-2.5 text-sm font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition min-h-11">キャンセル</button>
+          <button id="confirmOkBtn" class="px-5 py-2.5 text-sm font-bold text-white bg-brand-blue hover:brightness-110 rounded-lg transition min-h-11">OK</button>
+        </div>
+      </div>
+    </div>
 
-
+    <!-- Prompt Modal -->
+    <div id="promptModal" class="fixed inset-0 bg-slate-950/85 z-[250] hidden items-center justify-center p-4 backdrop-blur-sm">
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+        <h3 id="promptTitle" class="text-lg font-bold text-slate-100 mb-2">入力</h3>
+        <p id="promptMessage" class="text-slate-300 text-sm leading-relaxed mb-4 whitespace-pre-line"></p>
+        <input id="promptInput" type="text" class="w-full bg-slate-950 border border-slate-700 focus:border-brand-cyan rounded-lg px-4 py-3 text-base text-slate-100 focus:outline-none mb-4" />
+        <div class="flex justify-end gap-3">
+          <button id="promptCancelBtn" class="px-5 py-2.5 text-sm font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition min-h-11">キャンセル</button>
+          <button id="promptOkBtn" class="px-5 py-2.5 text-sm font-bold text-white bg-brand-blue hover:brightness-110 rounded-lg transition min-h-11">保存</button>
+        </div>
+      </div>
+    </div>
 
     <!-- PWA Modals -->
 
     <!-- LINE Browser Warning Modal -->
-    <div id="lineWarningModal" class="fixed inset-0 bg-slate-950/90 z-[200] hidden flex items-center justify-center p-4 backdrop-blur-sm">
-      <div class="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+    <div id="lineWarningModal" class="fixed inset-0 bg-slate-950/90 z-[200] hidden items-center justify-center p-4 backdrop-blur-sm">
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
         <h3 class="text-xl font-bold text-red-400 mb-3 flex items-center gap-2"><i data-lucide="alert-triangle"></i> ブラウザ推奨</h3>
-        <p class="text-slate-300 text-sm mb-4 leading-relaxed">LINE内ブラウザではマイクやAI機能が正常に動作しません。<br><br>右上のメニュー（︙）から「他のブラウザで開く」を選択し、<strong class="text-emerald-400">Chrome</strong> または <strong class="text-blue-400">Edge</strong> をご利用ください。</p>
+        <p class="text-slate-300 text-sm mb-4 leading-relaxed">LINE内ブラウザではマイクや音声認識が正常に動作しません。<br><br>右上のメニュー（︙）から「他のブラウザで開く」を選択し、<strong class="text-emerald-400">Chrome</strong> または <strong class="text-brand-cyan">Edge</strong> をご利用ください。</p>
       </div>
     </div>
 
     <!-- PWA Install Prompt Modal (PC) -->
-    <div id="pwaInstallModal" class="fixed inset-0 bg-slate-950/80 z-[200] hidden flex items-center justify-center p-4 backdrop-blur-sm">
-      <div class="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-sm w-full shadow-2xl">
-        <h3 class="text-xl font-bold text-blue-400 mb-3 flex items-center gap-2"><i data-lucide="download"></i> アプリとしてインストール</h3>
-        <p class="text-slate-300 text-sm mb-4 leading-relaxed">PCブラウザのタブとしてではなく、独立したアプリとしてインストールすることをお勧めします。より快適に動作します。</p>
+    <div id="pwaInstallModal" class="fixed inset-0 bg-slate-950/80 z-[200] hidden items-center justify-center p-4 backdrop-blur-sm">
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+        <h3 class="text-xl font-bold text-brand-cyan mb-3 flex items-center gap-2"><i data-lucide="download"></i> アプリとしてインストール</h3>
+        <p class="text-slate-300 text-sm mb-4 leading-relaxed">ブラウザのタブとしてではなく、独立したアプリとしてインストールすると、より快適に動作します。</p>
         <div class="flex justify-end gap-3">
-          <button id="pwaInstallCancelBtn" class="px-4 py-2 text-sm text-slate-400 hover:text-white transition">後で</button>
-          <button id="pwaInstallBtn" class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold transition">インストール</button>
+          <button id="pwaInstallCancelBtn" class="px-4 py-2.5 text-sm text-slate-300 hover:text-white transition min-h-11">後で</button>
+          <button id="pwaInstallBtn" class="px-4 py-2.5 text-sm bg-brand-blue hover:brightness-110 text-white rounded-lg font-bold transition min-h-11">インストール</button>
         </div>
       </div>
     </div>
 
     <!-- PWA Update Modal -->
-    <div id="pwaUpdateModal" class="fixed bottom-4 right-4 bg-slate-800 border border-emerald-600/50 rounded-xl p-5 shadow-2xl z-[200] hidden max-w-sm animate-in slide-in-from-bottom-5">
+    <div id="pwaUpdateModal" class="fixed bottom-4 right-4 bg-slate-800 border border-emerald-600/50 rounded-2xl p-5 shadow-2xl z-[200] hidden max-w-sm">
       <h3 class="text-lg font-bold text-emerald-400 mb-2 flex items-center gap-2"><i data-lucide="refresh-cw"></i> アップデートがあります</h3>
       <p class="text-slate-300 text-sm mb-4">新しいバージョンが利用可能です。更新して最新機能を利用してください。</p>
       <div class="flex justify-end gap-3">
-        <button id="pwaUpdateBtn" class="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-bold transition">今すぐ更新</button>
+        <button id="pwaUpdateBtn" class="px-4 py-2.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition min-h-11">今すぐ更新</button>
       </div>
     </div>
-
-    <!-- Custom Mic Permission Guidance Modal -->
-    <div id="micPermissionModal" class="fixed inset-0 bg-slate-950/85 z-[210] hidden flex items-center justify-center p-4 backdrop-blur-md">
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl transform scale-95 transition-all duration-300">
-        <div class="flex items-center gap-3 mb-4 text-amber-500">
-          <div class="bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
-            <i data-lucide="mic-off" class="w-6 h-6"></i>
-          </div>
-          <h3 class="text-xl font-bold text-slate-100">マイク権限が必要です</h3>
-        </div>
-        <div class="space-y-4 text-slate-300 text-sm mb-6 leading-relaxed">
-          <p>録音とリアルタイム文字起こしを開始するには、ブラウザでのマイク使用許可が必要です。</p>
-          
-          <div class="bg-slate-950/50 p-4 rounded-xl border border-slate-850 space-y-3">
-            <h4 class="font-bold text-slate-200 text-xs tracking-wider uppercase flex items-center gap-1.5">
-              <i data-lucide="chrome" class="w-3.5 h-3.5 text-blue-400"></i> Google Chrome / Microsoft Edge
-            </h4>
-            <ol class="list-decimal pl-4 space-y-1 text-slate-400 text-xs">
-              <li>アドレスバー左側の<strong class="text-slate-200">鍵アイコン</strong>をクリックします。</li>
-              <li>「マイク」の設定を<strong class="text-blue-400">「許可」</strong>に変更します。</li>
-              <li>ページを再読み込み（リロード）して再試行してください。</li>
-            </ol>
-          </div>
-
-          <div id="iframeWarningBox" class="bg-amber-500/10 border border-amber-500/20 text-amber-200 p-3.5 rounded-xl text-xs flex gap-2.5">
-            <i data-lucide="alert-circle" class="w-4 h-4 shrink-0 text-amber-400"></i>
-            <div>
-              <strong>プレビュー画面（枠内）で実行中の場合：</strong><br>
-              ブラウザのセキュリティ制限により、この枠内ではマイクが許可されません。画面右上にある<strong>「新しいタブで開く」アイコン</strong>から起動してください。
-            </div>
-          </div>
-        </div>
-        <div class="flex justify-end">
-          <button id="closePermissionModalBtn" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-sm font-bold transition">閉じる</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Custom Session Save Input Modal -->
-    <div id="saveSessionModal" class="fixed inset-0 bg-slate-950/85 z-[210] hidden flex items-center justify-center p-4 backdrop-blur-md">
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl transform scale-95 transition-all duration-300">
-        <div class="flex items-center gap-3 mb-4 text-blue-400">
-          <div class="bg-blue-500/10 p-2.5 rounded-xl border border-blue-500/20">
-            <i data-lucide="save" class="w-6 h-6"></i>
-          </div>
-          <h3 class="text-xl font-bold text-slate-100">セッションの保存</h3>
-        </div>
-        <div class="mb-5">
-          <label for="sessionTitleInput" class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">会議のタイトル</label>
-          <input type="text" id="sessionTitleInput" class="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition" placeholder="タイトルを入力...">
-        </div>
-        <div class="flex justify-end gap-3">
-          <button id="cancelSaveBtn" class="px-5 py-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl text-sm font-bold transition">保存しない</button>
-          <button id="confirmSaveBtn" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition shadow-lg shadow-blue-900/40">保存する</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Custom Reusable Confirm Modal -->
-    <div id="customConfirmModal" class="fixed inset-0 bg-slate-950/85 z-[210] hidden flex items-center justify-center p-4 backdrop-blur-md">
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl transform scale-95 transition-all duration-300">
-        <div class="flex items-center gap-3 mb-4 text-red-400" id="confirmHeader">
-          <div class="bg-red-500/10 p-2.5 rounded-xl border border-red-500/20" id="confirmIconBox">
-            <i data-lucide="alert-triangle" class="w-6 h-6" id="confirmIcon"></i>
-          </div>
-          <h3 class="text-xl font-bold text-slate-100" id="confirmTitle">確認</h3>
-        </div>
-        <p class="text-slate-300 text-sm mb-6 leading-relaxed" id="confirmMessage">本当にこの操作を実行しますか？</p>
-        <div class="flex justify-end gap-3">
-          <button id="cancelConfirmBtn" class="px-5 py-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl text-sm font-bold transition">キャンセル</button>
-          <button id="confirmConfirmBtn" class="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-bold transition shadow-lg shadow-red-900/40">実行する</button>
-        </div>
-      </div>
-    </div>
-
-
 
     <!-- Main Logic as ES Module -->
     <script type="module" src="/src/app.js"></script>

@@ -1,1 +1,6 @@
-{"name":"Untitled","description":"純粋な録音機能と文字起こし、セッション保存を提供するアプリ","requestFramePermissions":["microphone","speech-recognition"],"majorCapabilities":["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]}
+{
+  "name": "QB議事録アシスタント",
+  "description": "録音・文字起こし・重要メモ・セッション保存をブラウザ内で完結（QB HOUSE）",
+  "requestFramePermissions": ["microphone", "speech-recognition"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
