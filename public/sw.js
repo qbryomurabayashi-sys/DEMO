@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ai-meeting-v2';
+const CACHE_NAME = 'qb-meeting-v3';
 
 self.addEventListener('install', (event) => {
   // 自動でskipWaitingしないように変更（ユーザーの更新ボタン押下を待つ）
