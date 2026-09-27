@@ -1,10 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!--
+    議事録アシスタントのアイコン（PNG は scripts/generate-icons.js でここから作る）。
+    ・背景は #00004B で全面。四隅の角を丸めない。赤は使わない。文字は入れない（ロゴ規約）。
+    ・マイクは中央 60%（102〜410）の内側に収める。Android の丸抜きで欠けないように。
+      いまの範囲：横 146〜366、縦 112〜400。
+  -->
   <defs>
-    <linearGradient id="qbGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#00a7ea"/>
-      <stop offset="1" stop-color="#0072ce"/>
+    <linearGradient id="micBlue" x1="0" y1="218" x2="0" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#00A5EB"/>
+      <stop offset="1" stop-color="#0082CD"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="#0a1a3d"/>
-  <path d="M256 320c35.3 0 64-28.7 64-64V128c0-35.3-28.7-64-64-64s-64 28.7-64 64v128c0 35.3 28.7 64 64 64zm-96-64v16c0 53 43 96 96 96s96-43 96-96v-16h32v16c0 67.6-52.6 123.1-118.5 127.6V448h62.5v32H184v-32h62.5v-48.4C180.6 395.1 128 339.6 128 272v-16h32z" fill="url(#qbGrad)"/>
+  <rect width="512" height="512" fill="#00004B"/>
+  <!-- マイクの頭（白） -->
+  <path d="M208 160a48 48 0 0 1 96 0v84a48 48 0 0 1-96 0z" fill="#FFFFFF"/>
+  <!-- 頭を受けるU字 -->
+  <path d="M146 232v12a110 110 0 0 0 220 0v-12a14 14 0 0 0-28 0v12a82 82 0 0 1-164 0v-12a14 14 0 0 0-28 0z" fill="url(#micBlue)"/>
+  <!-- 軸と台 -->
+  <path d="M242 350h28v26h34a12 12 0 0 1 0 24h-96a12 12 0 0 1 0-24h34z" fill="url(#micBlue)"/>
 </svg>

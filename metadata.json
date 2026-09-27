@@ -1,6 +1,0 @@
-{
-  "name": "QB議事録アシスタント",
-  "description": "録音・文字起こし・重要メモ・セッション保存をブラウザ内で完結（QB HOUSE）",
-  "requestFramePermissions": ["microphone", "speech-recognition"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
