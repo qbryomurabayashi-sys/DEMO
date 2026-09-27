@@ -1,24 +1,16 @@
 import tailwindcss from '@tailwindcss/vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
-import {defineConfig, loadEnv} from 'vite';
+import fs from 'fs';
+import {defineConfig} from 'vite';
 
-export default defineConfig(({mode}) => {
-  const env = loadEnv(mode, '.', '');
-  return {
-    plugins: [react(), tailwindcss()],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-    },
-    resolve: {
-      alias: {
-        '@': path.resolve(__dirname, '.'),
-      },
-    },
-    server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
-      hmr: process.env.DISABLE_HMR !== 'true',
-    },
-  };
+// 版の出どころは public/version.json の1か所だけ。
+// 画面の版表示（#appVersion）と「更新しました」のお知らせは、ここで埋め込む __APP_VERSION__ を読む。
+const {version} = JSON.parse(
+  fs.readFileSync(new URL('./public/version.json', import.meta.url), 'utf-8'),
+);
+
+export default defineConfig({
+  plugins: [tailwindcss()],
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+  },
 });
