@@ -17,7 +17,7 @@ import { checkAvailability, installLanguagePack, startTranscriber } from './sr.j
 import { createWave } from './wave.js';
 import { tidyTranscript } from './lib/filler.js';
 import { formatMemoLine, secToStamp, lastStampSec } from './lib/minutes.js';
-import { provisionalTitle, isLineInApp, isIOS, isMobileOrTablet, shouldShowUpdateToast, pickMimeType } from './lib/util.js';
+import { provisionalTitle, isLineInApp, isInAppBrowser, chromeOpenUrl, isIOS, isMobileOrTablet, shouldShowUpdateToast, pickMimeType } from './lib/util.js';
 import { detectBrowser, srBannerFor, SR_ACTION_LABELS } from './lib/banner.js';
 import {
     formatClock, formatSessionDate, buildTranscriptTxt, makeTextBlob, transcriptTxtFilename, audioFilename,
@@ -27,7 +27,10 @@ import {
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '4.0.0';
 const UA = navigator.userAgent || '';
 const TOUCH = navigator.maxTouchPoints || 0;
-const IS_LINE = isLineInApp(UA);
+const STANDALONE = !!((window.navigator && window.navigator.standalone === true)
+    || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
+// アプリの中のブラウザ（LINE・LINE WORKS など）：録音ボタンを止め、Chrome で開くよう案内する（WebView では落ちることがある）
+const IS_LINE = isLineInApp(UA) || isInAppBrowser(UA, STANDALONE);
 const IS_MOBILE = isMobileOrTablet(UA, TOUCH);
 const IS_IOS = isIOS(UA, TOUCH);
 const BROWSER = detectBrowser(UA);
@@ -1490,7 +1493,15 @@ async function init() {
     state.source = CAN_PC && ls.get('source') === 'mix' ? 'mix' : 'mic';
     state.fillerOn = ls.get('filler') !== 'off';
     $('fillerToggle').setAttribute('aria-checked', String(state.fillerOn));
-    if (IS_LINE) setShown('lineBanner', true);
+    if (IS_LINE) {
+        setShown('lineBanner', true);
+        const open = $('lineOpenChromeBtn');
+        const url = chromeOpenUrl(UA, location.href);
+        if (open && url) {
+            open.setAttribute('href', url);
+            open.hidden = false;
+        }
+    }
     availP = refreshAvailability(); // 文字起こしが使えるかは、最初に確かめ始める（DB の後始末を待たない）
     wireEvents();
     renderSession();

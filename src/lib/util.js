@@ -50,6 +50,35 @@ export function isLineInApp(ua) {
     return /\bLine\//.test(ua || '');
 }
 
+// アプリの中のブラウザ（LINE・LINE WORKS・Facebook など）か。録音と文字起こしが不安定・落ちることがあるので、Chrome へ案内する。
+// - 名前で分かるもの：LINE（Line/）、LINE WORKS（LINEWORKS・worksmobile・NAVER の inapp）、Facebook、Instagram、KakaoTalk
+// - Android：アプリに組み込まれたブラウザ（WebView）は UA に「; wv)」が入る
+// - iPhone：アプリに組み込まれたブラウザは UA に「Safari/」が無い（Chrome・Firefox・Edge の iPhone 版は除く）。
+//   ただし「ホーム画面に追加」したアプリも Safari/ が無いので、standalone（ホーム画面から開いた）なら対象外
+export function isInAppBrowser(ua, standalone) {
+    const s = String(ua || '');
+    if (/\bLine\//.test(s)) return true;
+    if (/LINEWORKS|worksmobile|NAVER\(inapp/i.test(s)) return true;
+    if (/FBAN|FBAV|FB_IAB|Instagram|KAKAOTALK/i.test(s)) return true;
+    if (/Android/.test(s) && /; wv\)/.test(s)) return true;
+    const ios = /iPhone|iPad|iPod/.test(s);
+    if (ios && !standalone && !/Safari\//.test(s) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(s)) return true;
+    return false;
+}
+
+// 「Chrome で開く」のリンク先（Android は intent、iPhone は googlechromes:）。どちらでもなければ ''
+export function chromeOpenUrl(ua, href) {
+    const s = String(ua || '');
+    let u;
+    try { u = new URL(href); } catch (e) { return ''; }
+    const rest = u.host + u.pathname + u.search + u.hash;
+    if (/Android/.test(s)) {
+        return 'intent://' + rest + '#Intent;scheme=' + u.protocol.replace(':', '') + ';package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(u.href) + ';end';
+    }
+    if (/iPhone|iPad|iPod/.test(s)) return (u.protocol === 'https:' ? 'googlechromes://' : 'googlechrome://') + rest;
+    return '';
+}
+
 // タッチ点の数。数値でなければ 0（タッチなし）とみなす
 function touchPoints(n) {
     const v = Number(n);

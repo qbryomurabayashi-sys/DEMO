@@ -1,4 +1,4 @@
 {
-  "version": "4.0.3",
-  "releaseNotes": "文字起こしが始まらないときの案内を直しました（Chrome の「自動字幕起こし」をオンにする）。"
+  "version": "4.0.4",
+  "releaseNotes": "LINE・LINE WORKS などアプリの中のブラウザで開いたときは録音を止め、「Chrome で開いて」と案内します（［Chromeで開く］［URLをコピー］）。"
 }

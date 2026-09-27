@@ -9,6 +9,8 @@ import {
     minutesDocFilename,
     provisionalTitle,
     isLineInApp,
+    isInAppBrowser,
+    chromeOpenUrl,
     withOpenExternalBrowser,
     compareSemver,
     shouldShowUpdateToast,
@@ -297,4 +299,54 @@ test('端末の判定: Macintosh の UA は isIOS と isMac のどちらか一�
     for (const tp of [0, 1, 2, 5, 10]) {
         assert.notEqual(isIOS(MAC_SAFARI, tp), isMac(MAC_SAFARI, tp), String(tp));
     }
+});
+
+
+// ---- アプリの中のブラウザ ----
+const IA = {
+    lineIos: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Safari Line/14.0.0',
+    lineAndroid: 'Mozilla/5.0 (Linux; Android 14; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/125.0.0.0 Mobile Safari/537.36 Line/14.0.0/IAB',
+    worksIos: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 LINEWORKS/4.2.0',
+    worksAndroidWv: 'Mozilla/5.0 (Linux; Android 14; SM-S921B Build/UP1A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/140.0.0.0 Mobile Safari/537.36',
+    wkwebviewIos: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+    fbIos: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBAV/480.0]',
+    safariIos: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+    chromeIos: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/140.0 Mobile/15E148 Safari/604.1',
+    chromeAndroid: 'Mozilla/5.0 (Linux; Android 14; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36',
+    chromeWin: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36',
+    edgeWin: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36 Edg/154.0.0.0',
+};
+
+test('isInAppBrowser: LINE・LINE WORKS・Facebook・Android の WebView・iPhone のアプリ内は true', () => {
+    for (const k of ['lineIos', 'lineAndroid', 'worksIos', 'worksAndroidWv', 'wkwebviewIos', 'fbIos']) {
+        assert.equal(isInAppBrowser(IA[k], false), true, k);
+    }
+});
+
+test('isInAppBrowser: ふつうのブラウザは false（Safari・Chrome・Edge、PC とスマホ）', () => {
+    for (const k of ['safariIos', 'chromeIos', 'chromeAndroid', 'chromeWin', 'edgeWin']) {
+        assert.equal(isInAppBrowser(IA[k], false), false, k);
+    }
+});
+
+test('isInAppBrowser: iPhone の「ホーム画面に追加」から開いたときは false（UA に Safari が無くても）', () => {
+    assert.equal(isInAppBrowser(IA.wkwebviewIos, true), false);
+    assert.equal(isInAppBrowser(IA.worksIos, true), true); // 名前で分かるアプリは、standalone でも案内する
+});
+
+test('isInAppBrowser: 空・null でも落ちない', () => {
+    assert.equal(isInAppBrowser('', false), false);
+    assert.equal(isInAppBrowser(null, false), false);
+    assert.equal(isInAppBrowser(undefined), false);
+});
+
+test('chromeOpenUrl: Android は intent、iPhone は googlechromes、それ以外は空', () => {
+    const href = 'https://demo-8bj.pages.dev/?diag=1';
+    const a = chromeOpenUrl(IA.worksAndroidWv, href);
+    assert.ok(a.startsWith('intent://demo-8bj.pages.dev/?diag=1#Intent;scheme=https;package=com.android.chrome;'));
+    assert.ok(a.includes('S.browser_fallback_url=' + encodeURIComponent(href)));
+    assert.ok(a.endsWith(';end'));
+    assert.equal(chromeOpenUrl(IA.worksIos, href), 'googlechromes://demo-8bj.pages.dev/?diag=1');
+    assert.equal(chromeOpenUrl(IA.chromeWin, href), '');
+    assert.equal(chromeOpenUrl(IA.worksIos, 'not a url'), '');
 });

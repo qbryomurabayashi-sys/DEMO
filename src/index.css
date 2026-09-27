@@ -84,6 +84,7 @@
     font-size: 15px; font-weight: 700; line-height: 1.2; cursor: pointer; text-align: center;
   }
   .btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+  a.btn { text-decoration: none; }
   .btn-primary { background: var(--blue-mid); color: #fff; }
   .btn-primary:hover { background: var(--navy2); }
   .btn-secondary { background: #fff; color: var(--navy2); border-color: var(--blue-mid); }

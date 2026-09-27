@@ -14,6 +14,7 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/apple-icon-180.png">
     <link rel="stylesheet" href="/src/index.css">
+    <script src="/inapp.js" defer></script>
   </head>
   <body>
     <div id="topBar">
@@ -35,8 +36,9 @@
 
       <div id="lineBanner" class="banner" role="status" hidden>
         <i data-lucide="info" aria-hidden="true"></i>
-        <p class="banner-text">LINE の中では録音できません。外のブラウザで開いてください</p>
+        <p class="banner-text">アプリの中のブラウザ（LINE・LINE WORKS など）では録音できません。Chrome で開いてください</p>
         <div class="banner-actions">
+          <a id="lineOpenChromeBtn" class="btn btn-primary" href="#" hidden>Chromeで開く</a>
           <button id="lineCopyUrlBtn" class="btn btn-secondary" type="button">URLをコピー</button>
           <button id="lineBannerCloseBtn" class="btn-icon" type="button" aria-label="閉じる"><i data-lucide="x" aria-hidden="true"></i></button>
         </div>
