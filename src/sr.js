@@ -141,6 +141,12 @@ export function startTranscriber(opts, deps) {
         restartTimer = null;
     }
 
+    // 診断の表示（?diag=1 のときだけ app.js が渡す）。無ければ何もしない
+    function dbg(msg) {
+        if (typeof o.onDebug !== 'function') return;
+        try { o.onDebug(msg); } catch (e) { /* 診断の失敗で文字起こしを止めない */ }
+    }
+
     // app.js から渡された関数を呼ぶ（無ければ何もしない。app 側の例外で文字起こしの状態を壊さない）
     function call(fn, arg) {
         if (typeof fn !== 'function') return;
@@ -245,6 +251,12 @@ export function startTranscriber(opts, deps) {
             if (s.closed) return;
             s.gotResult = true;
             everGotResult = true;
+            if (o.onDebug) {
+                const last = event && event.results && event.results[event.results.length - 1];
+                const n = last && last[0] ? String(last[0].transcript).length : 0;
+                if (last && last.isFinal) dbg('result 確定 ' + n + '文字');
+                else if (!s.loggedInterim) { s.loggedInterim = true; dbg('result 途中（この回の最初） ' + n + '文字'); }
+            }
             const results = event && event.results;
             const from = event && typeof event.resultIndex === 'number' ? event.resultIndex : 0;
             let interim = '';
@@ -268,7 +280,13 @@ export function startTranscriber(opts, deps) {
 
         // エラー：stop() のあとは何もしない（end か10秒を待つ）。no-speech／aborted は数えない。
         // 4種はすぐ止める。それ以外は、この回の失敗として1回だけ数える
+        if (typeof r.addEventListener === 'function') {
+            ['start', 'audiostart', 'soundstart', 'speechstart', 'speechend', 'audioend'].forEach(function (n) {
+                r.addEventListener(n, function () { if (!s.closed) dbg(n); });
+            });
+        }
         r.onerror = function (event) {
+            dbg('error ' + (event && event.error) + (event && event.message ? ' ' + event.message : ''));
             if (s.closed || stopped) return;
             s.anyError = true;
             const code = event && event.error;
@@ -289,6 +307,7 @@ export function startTranscriber(opts, deps) {
         //   2秒未満・結果なし → 「短く終わった回」（待ちを延ばす。エラーの種類は問わない）
         //   そのうちエラーが1つも無かった回 → 失敗1回（エラーのあった回は onerror で数えてある）
         r.onend = function () {
+            dbg('end ' + (now() - s.startedAt) + 'ms' + (s.gotResult ? '' : ' 結果なし'));
             if (s.closed) return;
             const short = !s.gotResult && now() - s.startedAt < QUICK_END_MS;
             closeSession(s);
@@ -310,8 +329,10 @@ export function startTranscriber(opts, deps) {
 
         s.startedAt = now();
         try {
+            dbg('start(track) ' + (o.track && o.track.readyState) + ' processLocally=' + r.processLocally);
             r.start(o.track);
         } catch (e) {
+            dbg('start の例外 ' + (e && e.name) + ' ' + (e && e.message));
             // track で始められない。引数なしの start() は実測で文字が0件だったので使わず、文字起こしを止める（録音は続く）
             halt();
         }
@@ -329,6 +350,11 @@ export function startTranscriber(opts, deps) {
         }
         if (stopped) return;
         if (!r) {
+            if (o.onDebug) {
+                let v = '?';
+                try { v = await checkAvailability(o.SR); } catch (e) { v = 'error'; }
+                dbg('作れない available=' + v);
+            }
             halt();
             return;
         }

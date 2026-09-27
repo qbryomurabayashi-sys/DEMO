@@ -32,6 +32,18 @@ const IS_MOBILE = isMobileOrTablet(UA, TOUCH);
 const IS_IOS = isIOS(UA, TOUCH);
 const BROWSER = detectBrowser(UA);
 const CAN_PC = canCapturePcAudio();
+// 診断の表示：アドレスの最後に ?diag=1 を付けて開いたときだけ（普段は出さない）
+const DIAG = /[?&]diag=1(&|$)/.test(location.search);
+let diagLines = [];
+function diag(msg) {
+    if (!DIAG) return;
+    const d = new Date();
+    const hh = (n) => String(n).padStart(2, '0');
+    diagLines.push(hh(d.getHours()) + ':' + hh(d.getMinutes()) + ':' + hh(d.getSeconds()) + ' ' + msg);
+    if (diagLines.length > 50) diagLines = diagLines.slice(0, 3).concat(diagLines.slice(-47)); // 先頭の3行（版・マイク・渡す音）は残す
+    const box = document.getElementById('diagBox');
+    if (box) { box.hidden = false; box.textContent = diagLines.join('\n'); }
+}
 
 const TEXT_SAVE_EVERY = 10;      // ondataavailable 10回（約10秒）ごとに文字を保存（変わったときだけ）
 const AUDIO_SAVE_EVERY = 30;     // 30回（約30秒）ごとに音声の断片を保存
@@ -766,6 +778,7 @@ function onRecorderStart(r) {
     state.phase = 'recording';
     state.srStoppedNotice = false;
     state.srBannerClosed = false; // 準備が要るなら、録音のたびに帯をもう一度見せる
+    diag('録音開始 使えるか=' + state.srAvail + (state.srInstall ? ' 準備=' + state.srInstall : '') + (state.srFreshInstall ? ' 開き直し待ち' : ''));
     r.session = {
         id: null, title: provisionalTitle(r.startedAt), text: '', rawText: '', audioBlob: null,
         timestamp: r.startedAt, startedAt: r.startedAt, status: 'recording', mimeType: r.mimeType, updatedAt: r.startedAt,
@@ -889,9 +902,19 @@ function onLevels(r, lv) {
 
 // ---- 11. 文字起こし（端末内だけ） ----
 function startTranscription(r) {
+    if (DIAG) {
+        const mt = r.micStream && r.micStream.getAudioTracks()[0];
+        const ms = mt && mt.getSettings ? mt.getSettings() : {};
+        const st = r.graph.srTrack;
+        const ss = st && st.getSettings ? st.getSettings() : {};
+        diag('v' + APP_VERSION + ' ' + (UA.match(/Chrome\/[\d.]+/) || [''])[0] + ' 使えるか=' + state.srAvail);
+        diag('マイク ' + (mt ? mt.label : 'なし') + ' ' + ms.channelCount + 'ch ' + ms.sampleRate + 'Hz');
+        diag('文字起こしに渡す音 ' + (st ? st.readyState + ' ' + ss.channelCount + 'ch ' + ss.sampleRate + 'Hz' : 'なし') + (r.pcActive ? '（PCの音あり）' : ''));
+    }
     r.transcriber = startTranscriber({
         track: r.graph.srTrack,
         onFinal: (text) => onFinal(r, text),
+        onDebug: DIAG ? diag : undefined,
         onInterim: (text) => {
             if (text && state.srRestartNotice) { state.srRestartNotice = false; refreshSrBanner(); }
             // 話し始めの時刻（その文の最初の途中結果）を覚えておき、確定したときの行頭の時刻に使う（音声の位置と合わせやすく）

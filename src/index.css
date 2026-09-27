@@ -248,6 +248,11 @@
   .t-gap { font-size: 13px; color: var(--navy2); }
   .interim { margin: 6px 0 0; font-size: 16px; line-height: 1.7; color: var(--blue-mid); }
   .interim:empty { display: none; }
+  .diag-box:not([hidden]) {
+    margin: 12px 0 0; padding: 8px 10px; max-height: 320px; overflow: auto;
+    font-size: 12px; line-height: 1.5; white-space: pre-wrap; color: var(--navy);
+    background: var(--tint); border: 1px solid var(--line); border-radius: 6px;
+  }
 
   /* ---- メモ欄（下に固定） ---- */
   .memo-bar {
