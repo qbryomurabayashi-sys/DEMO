@@ -64,6 +64,8 @@ const PC_CONFIRM_MESSAGE = '相手全員に録音を伝えましたか\nPCの通
 const SOURCE_HINT = '共有の画面で『画面全体』を選び『システム オーディオも共有する』をオン（映像は使いません）。イヤホン推奨';
 const GAP_LINE = '※この時刻から録れていない可能性（マイクが止まりました）';
 const GAP_BACK_LINE = '※この時刻から録音が戻りました';
+// 文字起こしが始まらないまま続くときの案内（原因は2通り。どちらも Chrome の側）
+const RESTART_HELP = '文字起こしが始まりません。① Chrome をいったん全部閉じて開き直す ② それでも出ないときは、Chrome の設定の「ユーザー補助」で「自動字幕起こし」をオン（言語は日本語。「リアルタイム翻訳」はオフのまま）';
 
 // ---- 2. 状態 ----
 // phase：'idle'（待機）/ 'starting'（開始処理中）/ 'recording'（録音中）/ 'stopping'（停止処理中）
@@ -157,7 +159,8 @@ function renderTranscript(text) {
 
 // 文字起こしが動いていないときの案内（なぜ出ないか・どうすれば出るかを1行で）
 function srHintText() {
-    if (state.srRestartNotice || state.srFreshInstall) return 'Chrome をいったん全部閉じて開き直すと、文字起こしが使えます（準備のあとに1回だけ）';
+    if (state.srFreshInstall) return 'Chrome をいったん全部閉じて開き直すと、文字起こしが使えます（準備のあとに1回だけ）';
+    if (state.srRestartNotice) return RESTART_HELP;
     if (state.srInstall === 'installing' || state.srAvail === 'downloading') return '文字起こしの準備中です。終わると文字が出ます';
     if (state.srInstall === 'failed') return '文字起こしの準備ができませんでした。上の［もう一度］を押してください';
     if (state.srAvail === 'downloadable') return '文字起こしは、上の［準備する］を押すと始まります（初回だけ）';
@@ -1212,7 +1215,9 @@ function onDrained(r, ghost) {
 function refreshSrBanner() {
     let b;
     if (state.srStoppedNotice && state.phase === 'recording') b = { text: '文字起こしは止まりました（録音は続いています）', action: null };
-    else if (state.srRestartNotice || state.srFreshInstall) b = { text: '文字起こしを使うには、Chrome をいったん全部閉じて、開き直してください（準備のあとに1回だけ）', action: null };
+    else if (state.srFreshInstall) b = { text: '文字起こしを使うには、Chrome をいったん全部閉じて、開き直してください（準備のあとに1回だけ）', action: null };
+    // 始まらないまま続く：Chrome の音声認識は「自動字幕起こし」の言語のデータが無いと動かない（2026-09-27 社長のPCで判明）
+    else if (state.srRestartNotice) b = { text: RESTART_HELP, action: null };
     else b = srBannerFor({ availability: state.srAvail, installState: state.srInstall, isMobile: IS_MOBILE, browser: BROWSER });
     const key = b ? b.text : '';
     if (key !== state.srBannerKey) {
