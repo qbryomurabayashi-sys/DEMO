@@ -455,7 +455,7 @@ test('startTranscriber: no-speech と aborted は数えない（すぐ終わっ�
         }
         assert.equal(h.tr.isRunning(), true, code);
         assert.equal(fake.log.made, 21, code);
-        assert.deepStrictEqual(h.got.notices, [], code);
+        assert.deepStrictEqual(h.got.notices, [], code); // aborted の「開き直して」は30秒たってから（ここは20秒）
     }
 });
 
@@ -577,11 +577,11 @@ test('startTranscriber: 60秒より前の失敗は数えない（あいだが空
 
 // ---- startTranscriber：作り直しまでの待ち（バックオフ） ----
 
-test('startTranscriber: 短く終わる回が続くと、待ちが 300ms → 1秒 → 3秒 → 10秒 と延び、以後は10秒（エラーの種類は問わない）', async () => {
+test('startTranscriber: 短く終わる回が続くと、待ちが 300ms → 1秒 → 3秒 → 10秒 と延び、以後は10秒（読み込み中の aborted を除く）', async () => {
     const fake = makeFakeSR();
     const h = await begin(fake);
     const seen = [];
-    const codes = ['no-speech', 'aborted', 'network', null, 'no-speech', 'aborted', null];
+    const codes = ['no-speech', 'no-speech', 'network', null, 'no-speech', 'no-speech', null]; // aborted は下の「読み込み中」
     for (const code of codes) {
         const r = fake.last();
         if (code) r.onerror({ error: code });
@@ -879,7 +879,7 @@ test('startTranscriber: 自分で止まったあとに stop() を呼んでも安
     assert.equal(fake.last().stopCount, 0);   // 自分で止まったときは abort 済み。stop() はもう呼ばない
 });
 
-test('startTranscriber: onNotice に渡す種類は stopped の1つだけ', async () => {
+test('startTranscriber: 失敗で止まるときの知らせは stopped（restart は aborted が続いたときだけ）', async () => {
     const seen = [];
     const scenarios = [
         { fake: { onStart: function () { throw new Error('x'); } } },
@@ -900,4 +900,75 @@ test('startTranscriber: onNotice に渡す種類は stopped の1つだけ', asyn
     }
     assert.ok(seen.length >= 4);
     for (const n of seen) assert.equal(n, 'stopped');
+});
+
+test('startTranscriber: 結果0件のまま aborted ですぐ終わる間は1秒ごとに作り直し、30秒続いたら restart を1回だけ知らせる', async () => {
+    const fake = makeFakeSR();
+    const h = await begin(fake);
+    const delays = [];
+    for (let i = 0; i < 40; i++) {
+        const r = fake.last();
+        r.onerror({ error: 'aborted' });
+        r.onend();
+        delays.push(h.clock.delays()[0]);
+        if (i === 25) assert.deepStrictEqual(h.got.notices, []);   // 30秒たつまでは知らせない
+        await toRestart(h);
+    }
+    assert.deepStrictEqual(h.got.notices, ['restart']);           // 1回だけ
+    assert.ok(delays.every((d) => d === 1000));                   // 読み込み中は待ちを延ばさない
+    assert.equal(h.tr.isRunning(), true);                         // 止めない
+    const p = h.tr.stop();
+    fake.last().onend();
+    assert.equal(await settled(p), true);
+});
+
+test('startTranscriber: 読み込み中の1秒ごとの作り直しは60秒まで。そのあとは待ちが延びる', async () => {
+    const fake = makeFakeSR();
+    const h = await begin(fake);
+    let last = null;
+    for (let i = 0; i < 70; i++) {
+        const r = fake.last();
+        r.onerror({ error: 'aborted' });
+        r.onend();
+        last = h.clock.delays()[0];
+        await toRestart(h);
+    }
+    assert.equal(last, 10000);
+    const p = h.tr.stop();
+    fake.last().onend();
+    assert.equal(await settled(p), true);
+});
+
+test('startTranscriber: 一度でも結果が来ていれば、あとで aborted が続いても restart は知らせない', async () => {
+    const fake = makeFakeSR();
+    const h = await begin(fake);
+    fake.last().onresult(resultEvent(0, [{ text: 'こんにちは', final: true }]));
+    fake.last().onend();
+    await toRestart(h);
+    for (let i = 0; i < 5; i++) {
+        const r = fake.last();
+        r.onerror({ error: 'aborted' });
+        r.onend();
+        await toRestart(h);
+    }
+    assert.deepStrictEqual(h.got.notices, []);
+    const p = h.tr.stop();
+    fake.last().onend();
+    assert.equal(await settled(p), true);
+});
+
+test('startTranscriber: aborted でも2秒以上続いた回は、restart の数に入れない', async () => {
+    const fake = makeFakeSR();
+    const h = await begin(fake);
+    for (let i = 0; i < 4; i++) {
+        const r = fake.last();
+        await h.clock.advance(2500);
+        r.onerror({ error: 'aborted' });
+        r.onend();
+        await toRestart(h);
+    }
+    assert.deepStrictEqual(h.got.notices, []);
+    const p = h.tr.stop();
+    fake.last().onend();
+    assert.equal(await settled(p), true);
 });

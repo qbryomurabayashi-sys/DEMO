@@ -61,6 +61,8 @@ const state = {
     srAvail: 'checking',       // 'checking' / 'available' / 'downloadable' / 'downloading' / 'unavailable' / 'no-api'
     srInstall: null,           // null / 'installing' / 'failed'
     srStoppedNotice: false,    // 録音中に文字起こしが止まった
+    srRestartNotice: false,    // 準備した直後で、Chrome を開き直すまで文字起こしが動かない（録音中に見分けた）
+    srFreshInstall: false,     // この画面で言語データを取得した（初回の取得のあとは、Chrome を開き直すまで動かない）
     srBannerKey: '',
     srBannerClosed: false,
     source: 'mic',             // 'mic' / 'mix'
@@ -141,6 +143,17 @@ function renderTranscript(text) {
     updatePlaceholder();
 }
 
+// 文字起こしが動いていないときの案内（なぜ出ないか・どうすれば出るかを1行で）
+function srHintText() {
+    if (state.srRestartNotice || state.srFreshInstall) return 'Chrome をいったん全部閉じて開き直すと、文字起こしが使えます（準備のあとに1回だけ）';
+    if (state.srInstall === 'installing' || state.srAvail === 'downloading') return '文字起こしの準備中です。終わると文字が出ます';
+    if (state.srInstall === 'failed') return '文字起こしの準備ができませんでした。上の［もう一度］を押してください';
+    if (state.srAvail === 'downloadable') return '文字起こしは、上の［準備する］を押すと始まります（初回だけ）';
+    if (IS_MOBILE) return 'この端末では文字起こしは出ません（録音とメモは使えます）';
+    if (BROWSER !== 'chrome') return 'このブラウザでは文字起こしは出ません。Chrome で開いてください（録音とメモは使えます）';
+    return 'この Chrome では文字起こしが使えません（録音とメモは使えます）';
+}
+
 function updatePlaceholder() {
     const has = $('transcriptionDisplay').childElementCount > 0;
     const el = $('transcriptionPlaceholder');
@@ -150,11 +163,23 @@ function updatePlaceholder() {
     }
     const srOk = state.srAvail === 'available' || state.srAvail === 'checking';
     let text;
-    if (state.phase === 'recording') text = rec && rec.transcriber ? '話すと、ここに文字が出ます' : 'この端末では文字起こしは出ません（録音とメモは使えます）';
+    if (state.phase === 'recording') {
+        text = ((rec && rec.transcriber) || state.srAvail === 'checking') && !state.srRestartNotice && !state.srFreshInstall
+            ? '話すと、ここに文字が出ます' : srHintText();
+    }
     else if (current) text = '（文字起こしはありません）';
-    else text = srOk ? '録音すると、ここに文字起こしが出ます' : 'この端末では文字起こしは出ません（録音とメモは使えます）';
+    else text = srOk ? '録音すると、ここに文字起こしが出ます' : srHintText();
     el.textContent = text;
     el.hidden = false;
+}
+
+// 録音中に「使える」になったら（起動直後の確認が済んだ・［準備する］が終わった）、その時点から文字起こしを始める
+function maybeStartTranscription() {
+    const r = rec;
+    if (!r || state.phase !== 'recording' || r.stopped || r.transcriber || !r.graph || !r.graph.srTrack) return;
+    if (state.srAvail !== 'available') return;
+    startTranscription(r);
+    updatePlaceholder();
 }
 
 function renderSessionHeader() {
@@ -740,6 +765,7 @@ function onRecorderStart(r) {
     r.startedAt = Date.now();
     state.phase = 'recording';
     state.srStoppedNotice = false;
+    state.srBannerClosed = false; // 準備が要るなら、録音のたびに帯をもう一度見せる
     r.session = {
         id: null, title: provisionalTitle(r.startedAt), text: '', rawText: '', audioBlob: null,
         timestamp: r.startedAt, startedAt: r.startedAt, status: 'recording', mimeType: r.mimeType, updatedAt: r.startedAt,
@@ -757,19 +783,10 @@ function onRecorderStart(r) {
     r.pcLastSoundAt = r.startedAt;
     r.stopMeters = startMeters(r.graph, (lv) => onLevels(r, lv));
     watchTracks(r);
-    // 録音を始めた時点で「使える」ときだけ文字起こしを始める（録音の途中で準備が済んでも、次の録音から）。
-    // 起動直後で、まだ確かめている最中なら、確かめ終わった時点で決める
-    if (r.graph.srTrack) {
-        if (state.srAvail === 'available') startTranscription(r);
-        else if (state.srAvail === 'checking' && availP) {
-            availP.then(() => {
-                if (rec === r && !r.stopped && !r.transcriber && state.srAvail === 'available') {
-                    startTranscription(r);
-                    updatePlaceholder();
-                }
-            });
-        }
-    }
+    // 文字起こしは「使える」なら今から。起動直後で確かめている最中なら、確かめ終わった時点で決める。
+    // 録音の途中で［準備する］が終わったときも、その時点から始める（maybeStartTranscription）
+    maybeStartTranscription();
+    if (state.srAvail === 'checking' && availP) availP.then(maybeStartTranscription);
     refreshSrBanner();
     updatePlaceholder();
     ensureSessionRecord(r);
@@ -876,20 +893,23 @@ function startTranscription(r) {
         track: r.graph.srTrack,
         onFinal: (text) => onFinal(r, text),
         onInterim: (text) => {
+            if (text && state.srRestartNotice) { state.srRestartNotice = false; refreshSrBanner(); }
             // 話し始めの時刻（その文の最初の途中結果）を覚えておき、確定したときの行頭の時刻に使う（音声の位置と合わせやすく）
             if (text && r.utterStartSec == null) r.utterStartSec = r.stoppedAtSec != null ? r.stoppedAtSec : elapsedSec(r);
             if (current === r.session) $('interimDisplay').textContent = tidyTranscript(text, { removeFillers: false });
         },
         onNotice: (kind) => {
-            if (kind === 'stopped' && rec === r && !r.stopped) {
-                state.srStoppedNotice = true;
-                refreshSrBanner();
-            }
+            if (rec !== r || r.stopped) return;
+            if (kind === 'stopped') state.srStoppedNotice = true;
+            if (kind === 'restart') state.srRestartNotice = true;
+            refreshSrBanner();
+            updatePlaceholder();
         },
     });
 }
 
 function onFinal(r, raw) {
+    if (state.srRestartNotice) { state.srRestartNotice = false; refreshSrBanner(); }
     const startSec = r.utterStartSec;
     r.utterStartSec = null;
     const rawClean = tidyTranscript(raw, { removeFillers: false });
@@ -1169,6 +1189,7 @@ function onDrained(r, ghost) {
 function refreshSrBanner() {
     let b;
     if (state.srStoppedNotice && state.phase === 'recording') b = { text: '文字起こしは止まりました（録音は続いています）', action: null };
+    else if (state.srRestartNotice || state.srFreshInstall) b = { text: '文字起こしを使うには、Chrome をいったん全部閉じて、開き直してください（準備のあとに1回だけ）', action: null };
     else b = srBannerFor({ availability: state.srAvail, installState: state.srInstall, isMobile: IS_MOBILE, browser: BROWSER });
     const key = b ? b.text : '';
     if (key !== state.srBannerKey) {
@@ -1199,12 +1220,16 @@ async function refreshAvailability() {
     if (state.srAvail === 'available') state.srInstall = null;
     refreshSrBanner();
     updatePlaceholder();
+    maybeStartTranscription();
     clearTimeout(pollTimer);
     if (state.srAvail === 'downloading') pollTimer = setTimeout(refreshAvailability, 5000);
 }
 
 // 準備（言語データの取得）。タップの中で、await を挟まずに install を呼ぶ
+const FRESH_INSTALL_MS = 8000; // 準備にこれ以上かかった＝言語データを取ってきた（開き直すまで動かない）
+
 function doInstall() {
+    const startedAt = Date.now();
     const p = installLanguagePack();
     state.srInstall = 'installing';
     refreshSrBanner();
@@ -1212,7 +1237,13 @@ function doInstall() {
         state.srAvail = await checkAvailability();
         if (state.srAvail === 'available') {
             state.srInstall = null;
-            showToast('文字起こしの準備ができました');
+            if (Date.now() - startedAt >= FRESH_INSTALL_MS) {
+                state.srFreshInstall = true;
+                showToast('準備ができました。Chrome をいったん全部閉じて開き直すと、文字起こしが使えます');
+            } else {
+                showToast(state.phase === 'recording' ? '文字起こしの準備ができました。ここから文字になります' : '文字起こしの準備ができました');
+            }
+            maybeStartTranscription();
         } else if (state.srAvail === 'downloading') {
             state.srInstall = null;
             clearTimeout(pollTimer);

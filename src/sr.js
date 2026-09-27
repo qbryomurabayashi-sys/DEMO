@@ -18,6 +18,14 @@ const FATAL_ERRORS = ['not-allowed', 'service-not-allowed', 'language-not-suppor
 const RESTART_DELAYS_MS = [300, 1000, 3000, 10000];
 const QUICK_END_MS = 2000;      // これより早く、結果なしで終わった回は「短く終わった回」
 const STOP_TIMEOUT_MS = 10000;  // stop() から、これだけ待っても end が来なければ打ち切る
+// 認識の部品の読み込み中は、始めるたびに 'aborted' ですぐ終わる（2026-09-27 実測）：
+// - 言語データを取得した画面のままでは、Chrome を開き直すまで直らない（3分間すべて aborted・結果0件）
+// - 開き直した直後も約20秒は aborted が続き、そのあと普通に動く
+// 結果が1回も来ないうちの aborted は「読み込み中」とみなし、待ちを延ばさず1秒ごとに作り直す（始めてから60秒まで）。
+// 30秒たっても結果が1回も来なければ、onNotice('restart')（Chrome を開き直して）を1回だけ知らせる。作り直しは続ける
+const LOADING_RETRY_MS = 1000;
+const LOADING_WINDOW_MS = 60000;
+const RESTART_HINT_AFTER_MS = 30000;
 const MAX_CONSECUTIVE = 5;      // 連続の失敗がこの数になったら止める
 const WINDOW_MS = 60000;        // 直近60秒のあいだに
 const MAX_IN_WINDOW = 10;       // この数の失敗があったら止める
@@ -107,6 +115,10 @@ export function startTranscriber(opts, deps) {
     let consecutive = 0;          // 連続の失敗の数（文字が確定したら0に戻す）
     let failTimes = [];           // 失敗した時刻（直近60秒ぶんだけ残す）
     let shortStreak = 0;          // 開始から2秒未満・結果なしで終わった回が、いくつ続いているか
+    let everGotResult = false;    // 始めてから、結果（途中のものも）が1回でも来たか
+    let loading = false;          // いま「読み込み中」（結果0件のまま、すぐ aborted で終わった）か
+    let restartHinted = false;    // 'restart' をもう知らせたか（1回だけ）
+    let beganAt = null;           // 文字起こしを始めた時刻（読み込み中の作り直しと、知らせる時刻の起点）
     let finished = false;         // 締め終わったか（onInterim('') と resolve が済んだ）
     let resolveDone = null;
     // stop() が返す Promise（1つだけ作る。必ず resolve し、reject しない）
@@ -203,10 +215,12 @@ export function startTranscriber(opts, deps) {
             return;
         }
         const i = Math.min(Math.max(shortStreak - 1, 0), RESTART_DELAYS_MS.length - 1);
+        // 読み込み中は待ちを延ばさない（読み込みが終わったら、すぐ文字になるように）
+        const wait = loading && now() - beganAt < LOADING_WINDOW_MS ? LOADING_RETRY_MS : RESTART_DELAYS_MS[i];
         restartTimer = later(function () {
             restartTimer = null;
             launch();
-        }, RESTART_DELAYS_MS[i]);
+        }, wait);
     }
 
     // 認識オブジェクト1つぶんを動かす。受け付けるのは、閉じていない回のイベントだけ（古い回・打ち切った回のものは捨てる）。
@@ -218,6 +232,7 @@ export function startTranscriber(opts, deps) {
             pending: '',        // 最後の結果の、まだ確定していない部分（締めるときに確定にする）
             gotResult: false,   // 結果（途中のものも）が1回でも来たか
             anyError: false,    // エラー（数えないものも）が出たか
+            aborted: false,     // 'aborted' のエラーが出たか
             counted: false,     // この回の失敗をもう数えたか（1回の認識につき最大1回）
             closed: false,      // この回はもう閉じたか
             startedAt: 0,
@@ -229,6 +244,7 @@ export function startTranscriber(opts, deps) {
         r.onresult = function (event) {
             if (s.closed) return;
             s.gotResult = true;
+            everGotResult = true;
             const results = event && event.results;
             const from = event && typeof event.resultIndex === 'number' ? event.resultIndex : 0;
             let interim = '';
@@ -256,6 +272,7 @@ export function startTranscriber(opts, deps) {
             if (s.closed || stopped) return;
             s.anyError = true;
             const code = event && event.error;
+            if (code === 'aborted') s.aborted = true;
             if (QUIET_ERRORS.indexOf(code) !== -1) return;
             if (FATAL_ERRORS.indexOf(code) !== -1) {
                 halt();
@@ -281,6 +298,12 @@ export function startTranscriber(opts, deps) {
             }
             if (short && !s.anyError) countFailure();
             shortStreak = short ? shortStreak + 1 : 0;
+            // 読み込み中（結果0件のまま、すぐ aborted）かを見分ける。30秒続いたら「開き直して」を1回だけ知らせる
+            loading = short && s.aborted && !everGotResult;
+            if (loading && !restartHinted && now() - beganAt >= RESTART_HINT_AFTER_MS) {
+                restartHinted = true;
+                call(o.onNotice, 'restart');
+            }
             call(o.onInterim, '');
             afterEnd();
         };
@@ -342,6 +365,7 @@ export function startTranscriber(opts, deps) {
         return done;
     }
 
+    beganAt = now();
     launch();
     return {
         stop: stop,
