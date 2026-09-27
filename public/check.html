@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'">
+    <meta name="robots" content="noindex">
+    <title>端末の確かめ｜QB議事録</title>
+    <!-- 議事録の本体は読まない。判定（inapp.js）と、有る・無しを見るだけ（check.js）。何も送信・保存しない -->
+    <script src="/inapp.js"></script>
+    <style>
+      body { margin: 0; padding: 16px; background: #F4F7FB; color: #00004B; font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", "Meiryo", sans-serif; font-size: 16px; line-height: 1.6; }
+      h1 { margin: 0 0 8px; font-size: 20px; }
+      p { margin: 0 0 12px; }
+      table { width: 100%; border-collapse: collapse; background: #fff; }
+      th, td { padding: 8px; border-bottom: 1px solid #D5DEEA; text-align: left; vertical-align: top; font-size: 14px; }
+      th { width: 38%; color: #00327D; }
+      td { word-break: break-all; }
+    </style>
+  </head>
+  <body>
+    <h1>端末の確かめ（QB議事録）</h1>
+    <p>この画面の写真（スクリーンショット）を送ってください。この画面は、何も送信・保存しません。</p>
+    <table><tbody id="rows"></tbody></table>
+    <script src="/check.js"></script>
+  </body>
+</html>

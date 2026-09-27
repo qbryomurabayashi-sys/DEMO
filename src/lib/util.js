@@ -66,19 +66,6 @@ export function isInAppBrowser(ua, standalone) {
     return false;
 }
 
-// 「Chrome で開く」のリンク先（Android は intent、iPhone は googlechromes:）。どちらでもなければ ''
-export function chromeOpenUrl(ua, href) {
-    const s = String(ua || '');
-    let u;
-    try { u = new URL(href); } catch (e) { return ''; }
-    const rest = u.host + u.pathname + u.search + u.hash;
-    if (/Android/.test(s)) {
-        return 'intent://' + rest + '#Intent;scheme=' + u.protocol.replace(':', '') + ';package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(u.href) + ';end';
-    }
-    if (/iPhone|iPad|iPod/.test(s)) return (u.protocol === 'https:' ? 'googlechromes://' : 'googlechrome://') + rest;
-    return '';
-}
-
 // タッチ点の数。数値でなければ 0（タッチなし）とみなす
 function touchPoints(n) {
     const v = Number(n);

@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'">
     <title>QB議事録アシスタント</title>
+    <!-- アプリの中のブラウザ（LINE・LINE WORKS など）の判定。ほかより先に、defer なしで読む（当たったら本体は何も始めない） -->
+    <script src="/inapp.js"></script>
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#00004B">
     <meta name="mobile-web-app-capable" content="yes">
@@ -14,9 +16,37 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/apple-icon-180.png">
     <link rel="stylesheet" href="/src/index.css">
-    <script src="/inapp.js" defer></script>
   </head>
   <body>
+    <main id="inappScreen" class="inapp-screen" hidden>
+      <header class="app-header">
+        <div class="brand">
+          <div class="logo" role="img" aria-label="QB HOUSE">
+            <span class="logo-bar" aria-hidden="true"></span>
+            <span class="logo-qb">QB</span><span class="logo-house">HOUSE</span>
+          </div>
+          <span class="app-name">議事録</span>
+        </div>
+      </header>
+      <div class="inapp-body">
+        <h1 class="inapp-title">Chrome で開いてください</h1>
+        <p class="inapp-text">LINE・LINE WORKS などアプリの中のブラウザでは、録音できません。</p>
+        <ol class="inapp-steps">
+          <li>下の［URLをコピー］を押す</li>
+          <li>Chrome を開いて、アドレス欄に貼り付ける</li>
+        </ol>
+        <div class="inapp-actions">
+          <button id="inappCopyBtn" class="btn btn-primary" type="button">URLをコピー</button>
+          <a id="inappOpenBtn" class="btn btn-secondary" href="#" hidden>外のブラウザで開く</a>
+        </div>
+        <p id="inappCopyMsg" class="inapp-msg" role="status"></p>
+        <label class="inapp-label" for="inappUrl">開く URL</label>
+        <input id="inappUrl" class="inapp-url" type="text" readonly value="https://demo-8bj.pages.dev/">
+        <p class="inapp-hint">アプリの画面にある「ブラウザで開く」のボタンからも開けます。</p>
+        <p id="inappDiag" class="inapp-diag" hidden></p>
+      </div>
+    </main>
+
     <div id="topBar">
       <header class="app-header">
         <button id="toggleSidebarBtn" class="hdr-btn" type="button" aria-controls="sidebar" aria-expanded="false">
@@ -34,15 +64,6 @@
         </button>
       </header>
 
-      <div id="lineBanner" class="banner" role="status" hidden>
-        <i data-lucide="info" aria-hidden="true"></i>
-        <p class="banner-text">アプリの中のブラウザ（LINE・LINE WORKS など）では録音できません。Chrome で開いてください</p>
-        <div class="banner-actions">
-          <a id="lineOpenChromeBtn" class="btn btn-primary" href="#" hidden>Chromeで開く</a>
-          <button id="lineCopyUrlBtn" class="btn btn-secondary" type="button">URLをコピー</button>
-          <button id="lineBannerCloseBtn" class="btn-icon" type="button" aria-label="閉じる"><i data-lucide="x" aria-hidden="true"></i></button>
-        </div>
-      </div>
       <div id="storageBanner" class="banner" role="status" hidden>
         <i data-lucide="triangle-alert" aria-hidden="true"></i>
         <p id="storageBannerText" class="banner-text"></p>

@@ -10,7 +10,6 @@ import {
     provisionalTitle,
     isLineInApp,
     isInAppBrowser,
-    chromeOpenUrl,
     withOpenExternalBrowser,
     compareSemver,
     shouldShowUpdateToast,
@@ -338,15 +337,4 @@ test('isInAppBrowser: 空・null でも落ちない', () => {
     assert.equal(isInAppBrowser('', false), false);
     assert.equal(isInAppBrowser(null, false), false);
     assert.equal(isInAppBrowser(undefined), false);
-});
-
-test('chromeOpenUrl: Android は intent、iPhone は googlechromes、それ以外は空', () => {
-    const href = 'https://demo-8bj.pages.dev/?diag=1';
-    const a = chromeOpenUrl(IA.worksAndroidWv, href);
-    assert.ok(a.startsWith('intent://demo-8bj.pages.dev/?diag=1#Intent;scheme=https;package=com.android.chrome;'));
-    assert.ok(a.includes('S.browser_fallback_url=' + encodeURIComponent(href)));
-    assert.ok(a.endsWith(';end'));
-    assert.equal(chromeOpenUrl(IA.worksIos, href), 'googlechromes://demo-8bj.pages.dev/?diag=1');
-    assert.equal(chromeOpenUrl(IA.chromeWin, href), '');
-    assert.equal(chromeOpenUrl(IA.worksIos, 'not a url'), '');
 });

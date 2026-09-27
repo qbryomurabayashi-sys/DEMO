@@ -17,7 +17,7 @@ import { checkAvailability, installLanguagePack, startTranscriber } from './sr.j
 import { createWave } from './wave.js';
 import { tidyTranscript } from './lib/filler.js';
 import { formatMemoLine, secToStamp, lastStampSec } from './lib/minutes.js';
-import { provisionalTitle, isLineInApp, isInAppBrowser, chromeOpenUrl, isIOS, isMobileOrTablet, shouldShowUpdateToast, pickMimeType } from './lib/util.js';
+import { provisionalTitle, isLineInApp, isInAppBrowser, isIOS, isMobileOrTablet, shouldShowUpdateToast, pickMimeType } from './lib/util.js';
 import { detectBrowser, srBannerFor, SR_ACTION_LABELS } from './lib/banner.js';
 import {
     formatClock, formatSessionDate, buildTranscriptTxt, makeTextBlob, transcriptTxtFilename, audioFilename,
@@ -29,8 +29,9 @@ const UA = navigator.userAgent || '';
 const TOUCH = navigator.maxTouchPoints || 0;
 const STANDALONE = !!((window.navigator && window.navigator.standalone === true)
     || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
-// アプリの中のブラウザ（LINE・LINE WORKS など）：録音ボタンを止め、Chrome で開くよう案内する（WebView では落ちることがある）
-const IS_LINE = isLineInApp(UA) || isInAppBrowser(UA, STANDALONE);
+// アプリの中のブラウザ（LINE・LINE WORKS など）：本体は何も始めず、「Chrome で開いて」の画面（public/inapp.js）だけにする。
+// 判定は inapp.js が先に済ませて window.__QB_INAPP に置く。inapp.js が読めなかったときのために、同じ判定をここでもする
+const IS_INAPP = !!window.__QB_INAPP || isLineInApp(UA) || isInAppBrowser(UA, STANDALONE);
 const IS_MOBILE = isMobileOrTablet(UA, TOUCH);
 const IS_IOS = isIOS(UA, TOUCH);
 const BROWSER = detectBrowser(UA);
@@ -316,7 +317,7 @@ function updateUI() {
     const recBtn = $('recBtn');
     recBtn.classList.toggle('is-recording', recording);
     $('recBtnText').textContent = recording ? '録音停止' : '録音開始';
-    recBtn.disabled = IS_LINE || state.phase === 'starting' || state.phase === 'stopping';
+    recBtn.disabled = IS_INAPP || state.phase === 'starting' || state.phase === 'stopping';
     setDisabled('newSessionBtn', busy);
     document.querySelectorAll('.source-btn').forEach((b) => {
         b.disabled = busy;
@@ -677,7 +678,7 @@ async function obtainPcStream(pcP) {
 }
 
 async function startFlow() {
-    if (state.phase !== 'idle' || IS_LINE) return;
+    if (state.phase !== 'idle' || IS_INAPP) return;
     const useMix = CAN_PC && state.source === 'mix';
     const needNotice = ls.get('noticeSeen') !== '1';
     state.phase = 'starting';
@@ -1228,7 +1229,7 @@ function refreshSrBanner() {
         state.srBannerClosed = false; // 中身が変わったら、閉じていてもまた出す
     }
     const banner = $('srBanner');
-    if (!b || state.srBannerClosed || IS_LINE) {
+    if (!b || state.srBannerClosed || IS_INAPP) {
         banner.hidden = true;
         return;
     }
@@ -1451,8 +1452,6 @@ function wireEvents() {
         state.srBannerClosed = true;
         setShown('srBanner', false);
     });
-    on('lineCopyUrlBtn', 'click', copyUrl);
-    on('lineBannerCloseBtn', 'click', () => setShown('lineBanner', false));
     on('storageBannerCloseBtn', 'click', () => setShown('storageBanner', false));
     on('saveErrorCloseBtn', 'click', () => setShown('saveErrorBanner', false));
 
@@ -1482,6 +1481,16 @@ function wireEvents() {
 
 // ---- 19. 起動 ----
 async function init() {
+    // アプリの中のブラウザ：ここで止める。録音・保存・文字起こしの確認・マイクの一覧・Service Worker などは、
+    // LINE WORKS などの中で呼ぶと落ちることがあるので、1つも呼ばない（案内の画面は inapp.js が出す）
+    if (IS_INAPP) {
+        if (!window.__QB_INAPP) { // inapp.js が読めなかった：画面だけ切り替える（URL 欄は長押しでコピーできる）
+            document.documentElement.classList.add('is-inapp');
+            const s = $('inappScreen');
+            if (s) s.hidden = false;
+        }
+        return;
+    }
     const topBar = $('topBar');
     const setTopH = () => document.documentElement.style.setProperty('--topbar-h', topBar.offsetHeight + 'px');
     setTopH();
@@ -1493,15 +1502,6 @@ async function init() {
     state.source = CAN_PC && ls.get('source') === 'mix' ? 'mix' : 'mic';
     state.fillerOn = ls.get('filler') !== 'off';
     $('fillerToggle').setAttribute('aria-checked', String(state.fillerOn));
-    if (IS_LINE) {
-        setShown('lineBanner', true);
-        const open = $('lineOpenChromeBtn');
-        const url = chromeOpenUrl(UA, location.href);
-        if (open && url) {
-            open.setAttribute('href', url);
-            open.hidden = false;
-        }
-    }
     availP = refreshAvailability(); // 文字起こしが使えるかは、最初に確かめ始める（DB の後始末を待たない）
     wireEvents();
     renderSession();
