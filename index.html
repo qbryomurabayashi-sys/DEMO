@@ -2,7 +2,7 @@
 <html lang="ja" translate="no">
   <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'">
     <title>QB議事録アシスタント</title>
     <!-- アプリの中のブラウザ（LINE・LINE WORKS など）の判定。ほかより先に、defer なしで読む（当たったら本体は何も始めない） -->
@@ -49,9 +49,6 @@
 
     <div id="topBar">
       <header class="app-header">
-        <button id="toggleSidebarBtn" class="hdr-btn" type="button" aria-controls="sidebar" aria-expanded="false">
-          <i data-lucide="menu" aria-hidden="true"></i><span>履歴</span>
-        </button>
         <div class="brand">
           <div class="logo" role="img" aria-label="QB HOUSE">
             <span class="logo-bar" aria-hidden="true"></span>
@@ -59,44 +56,25 @@
           </div>
           <span class="app-name">議事録</span>
         </div>
-        <button id="newSessionBtn" class="hdr-btn" type="button">
-          <i data-lucide="plus" aria-hidden="true"></i><span>新規</span>
+        <button id="newSessionBtn" class="hdr-btn js-new-session pc-only" type="button">
+          <i data-lucide="plus" aria-hidden="true"></i><span>新しい会議</span>
         </button>
       </header>
-
-      <div id="storageBanner" class="banner" role="status" hidden>
-        <i data-lucide="triangle-alert" aria-hidden="true"></i>
-        <p id="storageBannerText" class="banner-text"></p>
-        <div class="banner-actions">
-          <button id="storageBannerCloseBtn" class="btn btn-secondary" type="button">閉じる</button>
-        </div>
-      </div>
-      <div id="saveErrorBanner" class="banner banner-error" role="alert" hidden>
-        <i data-lucide="triangle-alert" aria-hidden="true"></i>
-        <p id="saveErrorText" class="banner-text"></p>
-        <div class="banner-actions">
-          <button id="saveErrorCloseBtn" class="btn btn-on-dark" type="button">閉じる</button>
-        </div>
-      </div>
-      <div id="srBanner" class="banner" role="status" hidden>
-        <i data-lucide="info" aria-hidden="true"></i>
-        <p id="srBannerText" class="banner-text"></p>
-        <div class="banner-actions">
-          <button id="srBannerAction" class="btn btn-primary" type="button" hidden></button>
-          <button id="srBannerCloseBtn" class="btn btn-secondary" type="button">閉じる</button>
-        </div>
-      </div>
     </div>
 
     <div class="layout">
-      <aside id="sidebar" aria-label="履歴">
+      <!-- 履歴と設定。PC は左の列、スマホは［履歴］タブ -->
+      <aside id="sidebar" class="history-panel" aria-label="履歴">
         <div class="sidebar-head">
           <h2 class="sidebar-title">履歴</h2>
-          <button id="closeSidebarBtn" class="btn btn-secondary" type="button">閉じる</button>
+          <button id="newSessionBtnHistory" class="btn btn-secondary js-new-session phone-only" type="button">
+            <i data-lucide="plus" aria-hidden="true"></i><span>新しい会議</span>
+          </button>
         </div>
         <p id="historyPrivateNote" class="history-empty" hidden>PCの音を録音中は、履歴を隠しています（画面共有で映らないように）</p>
         <ul id="historyList" class="history-list"></ul>
         <div class="sidebar-foot">
+          <h2 class="foot-title">設定</h2>
           <button id="fillerToggle" class="switch" type="button" role="switch" aria-checked="true">
             <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
             <span class="switch-label">言いよどみ（えーと等）を消す</span>
@@ -106,24 +84,71 @@
           <p id="appVersion" class="foot-text"></p>
         </div>
       </aside>
-      <div id="sidebarOverlay" hidden></div>
 
+      <!-- 会議。スマホは［会議］タブ -->
       <main id="main">
-        <section id="recCard" class="card rec-card" aria-label="録音">
-          <h1 id="sessionTitle" class="session-title" hidden></h1>
-          <p id="sessionMeta" class="session-meta" hidden></p>
-          <div id="timerDisplay" class="timer" aria-live="off">00:00:00</div>
+        <div id="banners" class="banners">
+          <div id="storageBanner" class="banner" role="status" hidden>
+            <i data-lucide="triangle-alert" aria-hidden="true"></i>
+            <p id="storageBannerText" class="banner-text"></p>
+            <div class="banner-actions">
+              <button id="storageBannerCloseBtn" class="btn btn-secondary" type="button">閉じる</button>
+            </div>
+          </div>
+          <div id="saveErrorBanner" class="banner banner-error" role="alert" hidden>
+            <i data-lucide="triangle-alert" aria-hidden="true"></i>
+            <p id="saveErrorText" class="banner-text"></p>
+            <div class="banner-actions">
+              <button id="saveErrorCloseBtn" class="btn btn-on-dark" type="button">閉じる</button>
+            </div>
+          </div>
+          <div id="srBanner" class="banner" role="status" hidden>
+            <i data-lucide="info" aria-hidden="true"></i>
+            <p id="srBannerText" class="banner-text"></p>
+            <div class="banner-actions">
+              <button id="srBannerAction" class="btn btn-primary" type="button" hidden></button>
+              <button id="srBannerCloseBtn" class="btn btn-secondary" type="button">閉じる</button>
+            </div>
+          </div>
+        </div>
 
-          <div id="sourceGroup" class="segmented" role="radiogroup" aria-label="録音する音" hidden>
+        <section id="recCard" class="card rec-card" aria-label="録音">
+          <div id="sessionHead" class="session-head" hidden>
+            <div class="session-head-text">
+              <h1 class="session-title">
+                <button id="sessionRenameBtn" class="session-title-btn" type="button" aria-label="会議名を変える">
+                  <span id="sessionTitle"></span><i data-lucide="pencil" aria-hidden="true"></i>
+                </button>
+              </h1>
+              <p id="sessionMeta" class="session-meta" hidden></p>
+            </div>
+            <button id="newSessionBtnSession" class="btn btn-secondary js-new-session phone-only" type="button">新しい会議</button>
+          </div>
+
+          <div class="timer-wrap">
+            <div id="timerDisplay" class="timer" aria-live="off">00:00:00</div>
+            <p id="recState" class="rec-state">待機中</p>
+          </div>
+
+          <div id="sourceGroup" class="segmented source-group" role="radiogroup" aria-label="録音する音" hidden>
             <button class="source-btn seg-btn" type="button" role="radio" aria-checked="true" data-source="mic">マイク</button>
             <button class="source-btn seg-btn" type="button" role="radio" aria-checked="false" data-source="mix">マイク＋PCの音</button>
           </div>
-          <p id="sourceHint" class="hint" hidden>共有の画面で『画面全体』を選び『システム オーディオも共有する』をオン（映像は使いません）。イヤホン推奨</p>
 
-          <details id="micDetails" class="mic-details">
-            <summary>マイクの選択</summary>
-            <select id="micSelect" class="select" aria-label="マイクの選択"></select>
-          </details>
+          <div id="recSlot" class="rec-slot">
+            <button id="recBtn" class="rec-btn" type="button">
+              <i class="rec-icon-idle" data-lucide="mic" aria-hidden="true"></i>
+              <i class="rec-icon-rec" data-lucide="square" aria-hidden="true"></i>
+              <span id="recBtnText">録音開始</span>
+            </button>
+          </div>
+
+          <p id="sourceHint" class="hint source-hint" hidden>共有の画面で『画面全体』を選び『システム オーディオも共有する』をオン（映像は使いません）。イヤホン推奨</p>
+
+          <div id="micRow" class="mic-row">
+            <label class="mic-label" for="micSelect">マイク</label>
+            <select id="micSelect" class="select"></select>
+          </div>
 
           <div id="meters" class="meters" hidden>
             <div id="meterMicRow" class="meter-row">
@@ -142,28 +167,23 @@
           </div>
 
           <p id="mobileRecNote" class="hint" hidden>画面を消す・ほかのアプリに切り替える・電話に出ると、録音が止まります。画面を開いたままに</p>
-
-          <button id="recBtn" class="rec-btn" type="button">
-            <i class="rec-icon-idle" data-lucide="mic" aria-hidden="true"></i>
-            <i class="rec-icon-rec" data-lucide="square" aria-hidden="true"></i>
-            <span id="recBtnText">録音開始</span>
-          </button>
           <p id="lastSavedText" class="saved-text" hidden></p>
-
-          <div id="exportBar" class="export-bar" hidden>
-            <div class="export-buttons">
-              <button id="downloadTransBtn" class="btn btn-secondary" type="button"><i data-lucide="file-text" aria-hidden="true"></i><span>文字(.txt)</span></button>
-              <button id="downloadAudioBtn" class="btn btn-secondary" type="button"><i data-lucide="download" aria-hidden="true"></i><span>音声</span></button>
-            </div>
-            <p id="exportNote" class="hint">ファイルは端末内に保存してください（iCloud・OneDriveは不可）</p>
-            <p id="exportNoteIos" class="hint" hidden>iPhone：設定のSafari＞ダウンロードを「このiPhone内」に</p>
-          </div>
         </section>
 
         <section id="viewTranscription" class="card transcript-card" aria-labelledby="transcriptHeading">
           <div class="card-head">
-            <h2 id="transcriptHeading" class="card-title">文字起こし</h2>
-            <p id="srNote" class="hint">文字起こしは聞き漏れがあります。音声は全部残ります</p>
+            <div class="card-head-text">
+              <h2 id="transcriptHeading" class="card-title">文字起こし</h2>
+              <p id="srNote" class="hint">文字起こしは聞き漏れがあります。音声は全部残ります</p>
+            </div>
+            <div id="exportBar" class="export-bar" hidden>
+              <div class="export-buttons">
+                <button id="downloadTransBtn" class="btn btn-secondary" type="button"><i data-lucide="file-text" aria-hidden="true"></i><span>文字(.txt)</span></button>
+                <button id="downloadAudioBtn" class="btn btn-secondary" type="button"><i data-lucide="download" aria-hidden="true"></i><span>音声</span></button>
+              </div>
+              <p id="exportNote" class="hint">ファイルは端末内に保存してください（iCloud・OneDriveは不可）</p>
+              <p id="exportNoteIos" class="hint" hidden>iPhone：設定のSafari＞ダウンロードを「このiPhone内」に</p>
+            </div>
           </div>
           <p id="transcriptionPlaceholder" class="placeholder"></p>
           <div id="transcriptionDisplay" class="transcript"></div>
@@ -184,6 +204,17 @@
         </div>
       </main>
     </div>
+
+    <!-- スマホだけ：下のタブ。真ん中には録音ボタンを移す（app.js の placeRecBtn） -->
+    <nav id="tabBar" class="tab-bar" aria-label="画面の切り替え">
+      <button id="tabMeeting" class="tab-btn" type="button" data-tab="meeting" aria-current="page">
+        <i data-lucide="file-text" aria-hidden="true"></i><span>会議</span>
+      </button>
+      <div id="tabRecSlot" class="tab-rec-slot"></div>
+      <button id="tabHistory" class="tab-btn" type="button" data-tab="history">
+        <i data-lucide="history" aria-hidden="true"></i><span>履歴</span>
+      </button>
+    </nav>
 
     <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 

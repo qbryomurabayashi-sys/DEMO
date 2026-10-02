@@ -6,7 +6,7 @@
 
 import {
     createIcons,
-    Mic, Square, Menu, X, Plus, Pencil, Trash, FileText, Download, Copy, TriangleAlert, Info, Check,
+    Mic, Square, Menu, X, Plus, Pencil, Trash, FileText, Download, Copy, TriangleAlert, Info, Check, History,
 } from 'lucide';
 
 // ---- 要素の取得と、表示・押せる/押せない ----
@@ -90,7 +90,7 @@ export const ls = {
 // ---- アイコン ----
 // lucide を npm から同梱する（外部から読み込まない）。名前は lucide 1.48.0 の本名だけ（別名 trash-2 等は使わない）。
 // 使うアイコンはここに全部並べる（後から JS で入れるアイコンも、ここに無いと出ない）。
-const ICONS = { Mic, Square, Menu, X, Plus, Pencil, Trash, FileText, Download, Copy, TriangleAlert, Info, Check };
+const ICONS = { Mic, Square, Menu, X, Plus, Pencil, Trash, FileText, Download, Copy, TriangleAlert, Info, Check, History };
 
 // root を渡すとその中だけ描く（毎回ページ全体を描き直さない）
 export function renderIcons(root) {

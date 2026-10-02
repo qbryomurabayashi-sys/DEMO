@@ -57,6 +57,9 @@ const LOCK_PREFIX = 'qb-giji-rec-';      // 録音中の会議を、ほかの窓
 const FRESH_WITH_LOCK_MS = 15000;        // 鍵を取るまでのすき間（作った直後の記録は触らない）
 const FRESH_WITHOUT_LOCK_MS = 90000;     // Web Locks が無い端末：これより新しく書かれた 'recording' は録音中とみなす
 const RECOVER_AGAIN_MS = 30000;          // 起動時に見送った記録を、もう一度確かめるまで
+const REC_STATE_TEXT = { idle: '待機中', starting: '準備中', recording: '録音中', stopping: '保存中' }; // 時間の横の状態
+// スマホの並び（下のタブ）。src/index.css の 767px と同じ
+const PHONE_MQ = window.matchMedia ? window.matchMedia('(max-width: 767px)') : null;
 const WAVE_COLOR_MIC = '#00327D';
 const WAVE_COLOR_PC = '#0082CD';
 const CANCEL = { cancelled: true };      // 利用者がやめたとき（エラーのトーストを出さない）
@@ -202,15 +205,16 @@ function maybeStartTranscription() {
 }
 
 function renderSessionHeader() {
+    const head = $('sessionHead');
     const title = $('sessionTitle');
     const meta = $('sessionMeta');
     if (!current) {
-        title.hidden = true;
+        head.hidden = true;
         meta.hidden = true;
         return;
     }
     title.textContent = current.title || '（無題）';
-    title.hidden = false;
+    head.hidden = false;
     const parts = [formatSessionDate(current)];
     if (current.status === 'recording') parts.push('録音中');
     if (current.status === 'interrupted') parts.push('中断');
@@ -318,7 +322,12 @@ function updateUI() {
     recBtn.classList.toggle('is-recording', recording);
     $('recBtnText').textContent = recording ? '録音停止' : '録音開始';
     recBtn.disabled = IS_INAPP || state.phase === 'starting' || state.phase === 'stopping';
-    setDisabled('newSessionBtn', busy);
+    const recState = $('recState');
+    recState.textContent = REC_STATE_TEXT[state.phase] || REC_STATE_TEXT.idle;
+    recState.classList.toggle('is-on', recording);
+    document.querySelectorAll('.js-new-session').forEach((b) => { b.disabled = busy; });
+    setShown('newSessionBtnSession', !busy); // 録音中は、会議名の横に出さない（会議名に場所を譲る）
+    setShown('micRow', !recording);
     document.querySelectorAll('.source-btn').forEach((b) => {
         b.disabled = busy;
         b.setAttribute('aria-checked', String(b.getAttribute('data-source') === state.source));
@@ -545,7 +554,7 @@ async function openSession(id) {
     current = s;
     renderSession();
     prepareExports();
-    closeSidebar();
+    showTab('meeting');
     renderHistory();
 }
 
@@ -1341,17 +1350,43 @@ function addMemo() {
         .catch((e) => onSaveError(e, 'memo'));
 }
 
-// ---- 16. 履歴のドロワー ----
-function openSidebar() {
-    $('sidebar').classList.add('is-open');
-    setShown('sidebarOverlay', true);
-    $('toggleSidebarBtn').setAttribute('aria-expanded', 'true');
+// ---- 16. スマホの下のタブ（［会議］［履歴］）と、録音ボタンの置き場所 ----
+// ［履歴］は #history としてブラウザの履歴に積む。Android の戻るで［会議］に戻るように
+let historyTabPushed = false;
+
+function applyTab(tab) {
+    const t = tab === 'history' ? 'history' : 'meeting';
+    document.body.setAttribute('data-tab', t);
+    $('tabMeeting').setAttribute('aria-current', t === 'meeting' ? 'page' : 'false');
+    $('tabHistory').setAttribute('aria-current', t === 'history' ? 'page' : 'false');
 }
 
-function closeSidebar() {
-    $('sidebar').classList.remove('is-open');
-    setShown('sidebarOverlay', false);
-    $('toggleSidebarBtn').setAttribute('aria-expanded', 'false');
+function showTab(tab) {
+    if (tab === 'history') {
+        if (location.hash !== '#history') {
+            historyTabPushed = true;
+            location.hash = 'history'; // hashchange で applyTab
+        } else {
+            applyTab('history');
+        }
+        return;
+    }
+    if (location.hash === '#history') {
+        if (historyTabPushed) {
+            historyTabPushed = false;
+            history.back(); // hashchange で applyTab
+            return;
+        }
+        history.replaceState(null, '', location.pathname + location.search);
+    }
+    applyTab('meeting');
+}
+
+// スマホでは録音ボタンを下のタブの真ん中へ、PC では録音のカードへ（同じボタンを動かす＝つなぎ込みはそのまま）
+function placeRecBtn() {
+    const btn = $('recBtn');
+    const slot = PHONE_MQ && PHONE_MQ.matches ? $('tabRecSlot') : $('recSlot');
+    if (btn && slot && btn.parentNode !== slot) slot.appendChild(btn);
 }
 
 // ---- 17. マイクの一覧 ----
@@ -1377,7 +1412,10 @@ async function populateMics() {
 function wireEvents() {
     on('recBtn', 'click', () => {
         if (state.phase === 'recording') stopRecording('user');
-        else if (state.phase === 'idle') startFlow();
+        else if (state.phase === 'idle') {
+            startFlow();
+            showTab('meeting'); // 履歴のタブから押しても、録音中の画面を見せる
+        }
     });
     on('stopPcAudioBtn', 'click', () => { if (rec) endPcAudio(rec, false); });
     on('downloadTransBtn', 'click', () => {
@@ -1392,13 +1430,29 @@ function wireEvents() {
             if (target && unsavedAudio.delete(target)) updateLeaveGuard(); // 手元に保存したので、閉じるときの警告を外す
         }, IS_MOBILE);
     });
-    on('newSessionBtn', 'click', () => {
+    // ［新しい会議］は3か所（PC の上のバー・スマホの会議名の横・スマホの履歴タブ）
+    document.querySelectorAll('.js-new-session').forEach((b) => b.addEventListener('click', () => {
         if (isBusy()) return;
         current = null;
         renderSession();
         prepareExports();
         renderHistory();
+        showTab('meeting');
+    }));
+    on('sessionRenameBtn', 'click', () => { if (current) renameSession(current.id); });
+    on('tabMeeting', 'click', () => showTab('meeting'));
+    on('tabHistory', 'click', () => showTab('history'));
+    window.addEventListener('hashchange', () => {
+        if (location.hash !== '#history') historyTabPushed = false;
+        applyTab(location.hash === '#history' ? 'history' : 'meeting');
     });
+    if (PHONE_MQ) {
+        if (PHONE_MQ.addEventListener) PHONE_MQ.addEventListener('change', placeRecBtn);
+        else if (PHONE_MQ.addListener) PHONE_MQ.addListener(placeRecBtn);
+    }
+    // メモを打っている間は、スマホの下のタブを隠す（キーボードの上にメモ欄を残す）
+    on('manualMemoInput', 'focus', () => document.body.classList.add('is-typing'));
+    on('manualMemoInput', 'blur', () => document.body.classList.remove('is-typing'));
     on('sourceGroup', 'click', (e) => {
         const b = e.target.closest('.source-btn');
         if (!b || isBusy()) return;
@@ -1433,15 +1487,6 @@ function wireEvents() {
         if (btn.classList.contains('history-open')) openSession(id);
         else if (btn.classList.contains('history-rename')) renameSession(id);
         else if (btn.classList.contains('history-delete')) deleteSessionFlow(id);
-    });
-    on('toggleSidebarBtn', 'click', () => {
-        if ($('sidebar').classList.contains('is-open')) closeSidebar();
-        else openSidebar();
-    });
-    on('closeSidebarBtn', 'click', closeSidebar);
-    on('sidebarOverlay', 'click', closeSidebar);
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && !isDialogOpen()) closeSidebar();
     });
     on('srBannerAction', 'click', () => {
         const a = $('srBannerAction').getAttribute('data-action');
@@ -1504,6 +1549,8 @@ async function init() {
     $('fillerToggle').setAttribute('aria-checked', String(state.fillerOn));
     availP = refreshAvailability(); // 文字起こしが使えるかは、最初に確かめ始める（DB の後始末を待たない）
     wireEvents();
+    placeRecBtn();
+    applyTab(location.hash === '#history' ? 'history' : 'meeting');
     renderSession();
     prepareExports();
     updateUI();
@@ -1531,7 +1578,7 @@ async function init() {
             const count = (await db.getAllSessions()).length;
             const seen = ls.get('seenVersion');
             if (shouldShowUpdateToast({ sessionCount: count, seenVersion: seen, currentVersion: APP_VERSION })) {
-                showToast('v4.0 に更新しました。文字起こしは Chrome で動きます');
+                showToast('v4.1 に更新しました（画面を新しくしました）');
             }
         } catch (e) { /* お知らせは出せなくてよい */ }
     }
